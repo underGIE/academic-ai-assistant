@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="he" dir="auto">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Academic AI Assistant</title>
     <style>
       * {
@@ -11,165 +12,622 @@
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #f8fafc;
-        color: #1e293b;
+        background: #f5f7fa;
+        color: #333;
         width: 380px;
         min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
+
+      /* ── Header ── */
       .header {
-        background: #1f4e79;
-        color: white;
-        padding: 14px 20px;
+        background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
+        color: #fff;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        justify-content: space-between;
       }
       .header h1 {
         font-size: 15px;
         font-weight: 600;
       }
-      .header .version {
-        margin-left: auto;
+      .version {
         font-size: 10px;
-        opacity: 0.6;
+        opacity: 0.7;
         background: rgba(255, 255, 255, 0.15);
-        padding: 2px 6px;
-        border-radius: 10px;
+        padding: 2px 7px;
+        border-radius: 8px;
       }
-      .tabs {
+
+      /* ── Tabs ── */
+      .tab-bar {
         display: flex;
-        background: white;
-        border-bottom: 2px solid #e2e8f0;
+        background: #fff;
+        border-bottom: 1px solid #e9ecef;
       }
-      .tab {
+      .tab-btn {
         flex: 1;
         padding: 10px 4px;
-        text-align: center;
         font-size: 11px;
+        border: none;
+        background: none;
         cursor: pointer;
-        color: #64748b;
-        border-bottom: 3px solid transparent;
-        margin-bottom: -2px;
+        color: #777;
+        border-bottom: 2px solid transparent;
         transition: all 0.15s;
       }
-      .tab:hover {
-        background: #f8fafc;
+      .tab-btn.active {
+        color: #1a3a5c;
+        border-bottom-color: #1a3a5c;
+        font-weight: 600;
       }
-      .tab.active {
-        color: #1f4e79;
-        border-bottom-color: #1f4e79;
-        font-weight: 700;
+
+      /* ── Panels ── */
+      .panel {
+        flex: 1;
+        overflow-y: auto;
       }
-      .content {
-        padding: 14px;
+      .hidden {
+        display: none !important;
       }
-      .card {
-        background: white;
-        border-radius: 8px;
-        padding: 14px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #2e75b6;
-      }
-      .card h3 {
+
+      /* ── Empty state ── */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: #aaa;
         font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 4px;
+        text-align: center;
+        gap: 10px;
       }
-      .card p {
+      .empty-state span {
+        font-size: 38px;
+      }
+
+      /* ── Today ── */
+      .next-event-card {
+        background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
+        color: #fff;
+        margin: 12px;
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(26, 58, 92, 0.25);
+      }
+      .next-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        opacity: 0.75;
+        margin-bottom: 6px;
+      }
+      .event-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 5px;
+        line-height: 1.3;
+      }
+      .event-time {
         font-size: 12px;
-        color: #64748b;
-        line-height: 1.5;
-      }
-      .badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 11px;
-        font-weight: 600;
-        margin-top: 8px;
-      }
-      .badge-blue {
-        background: #deeaf1;
-        color: #1f4e79;
-      }
-      .badge-green {
-        background: #e2efda;
-        color: #375623;
-      }
-      .badge-orange {
-        background: #fce4d6;
-        color: #843c0c;
-      }
-      .btn {
-        display: inline-block;
-        margin-top: 10px;
-        padding: 7px 14px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 600;
-        transition: opacity 0.15s;
-      }
-      .btn:hover {
         opacity: 0.85;
       }
-      .empty {
-        text-align: center;
-        padding: 40px 20px;
-        color: #94a3b8;
+      .event-loc {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: 4px;
       }
-      .empty .icon {
-        font-size: 36px;
-        margin-bottom: 10px;
+      .section-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #aaa;
+        padding: 10px 16px 4px;
       }
-      .empty p {
+      .event-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        border-bottom: 1px solid #f0f0f0;
         font-size: 13px;
       }
-      .empty .sub {
+      .event-dot {
+        color: #2d6a9f;
+        font-size: 20px;
+        line-height: 1;
+      }
+      .event-row-title {
+        flex: 1;
+      }
+      .event-row-time {
         font-size: 11px;
-        margin-top: 6px;
-        color: #cbd5e1;
+        color: #999;
+        white-space: nowrap;
       }
-      .input {
-        width: 100%;
-        margin-top: 8px;
-        padding: 7px 10px;
-        border: 1px solid #e2e8f0;
-        border-radius: 5px;
-        font-size: 12px;
-        outline: none;
+
+      /* ── Inbox ── */
+      .filter-bar {
+        display: flex;
+        gap: 6px;
+        padding: 10px;
+        overflow-x: auto;
+        scrollbar-width: none;
       }
-      .input:focus {
-        border-color: #2e75b6;
-      }
-      .label {
+      .filter-btn {
         font-size: 11px;
+        padding: 4px 10px;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        background: #f8f9fa;
+        cursor: pointer;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .filter-btn.active {
+        background: #1a3a5c;
+        color: #fff;
+        border-color: #1a3a5c;
+      }
+      .count-badge {
+        font-size: 10px;
+        background: rgba(0, 0, 0, 0.1);
+        padding: 1px 5px;
+        border-radius: 6px;
+      }
+      .filter-btn.active .count-badge {
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .email-list {
+        padding: 8px;
+      }
+      .email-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 11px;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      }
+      .email-card.unread {
+        border-left: 3px solid #1a3a5c;
+      }
+      .email-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+      .email-from {
         font-weight: 600;
-        color: #64748b;
-        margin-top: 12px;
-        display: block;
+        font-size: 12px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .email-date {
+        font-size: 11px;
+        color: #999;
+        flex-shrink: 0;
+      }
+      .email-subject {
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 3px;
+      }
+      .email-snippet {
+        font-size: 11px;
+        color: #777;
+        margin-bottom: 5px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .email-badges {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .unread-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #1a3a5c;
+        flex-shrink: 0;
+      }
+      .badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 8px;
+      }
+      .badge-urgent {
+        background: #fde8e8;
+        color: #c0392b;
+      }
+      .badge-action {
+        background: #fff3cd;
+        color: #856404;
+      }
+
+      /* ── Chat ── */
+      #panel-chat {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 90px);
+      }
+      #panel-chat.hidden {
+        display: none !important;
+      }
+      #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .msg {
+        padding: 10px 13px;
+        border-radius: 14px;
+        font-size: 13px;
+        max-width: 88%;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .msg-user {
+        background: #1a3a5c;
+        color: #fff;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+      }
+      .msg-assistant {
+        background: #f0f4f8;
+        color: #333;
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+      }
+      .msg-loading {
+        opacity: 0.55;
+      }
+      .msg-ref {
+        display: inline-block;
+        background: #dceefb;
+        color: #1a3a5c;
+        padding: 2px 7px;
+        border-radius: 8px;
+        font-size: 10px;
+        margin: 2px 2px 0;
+      }
+      .quick-prompts {
+        display: flex;
+        gap: 6px;
+        padding: 6px 10px;
+        overflow-x: auto;
+        border-top: 1px solid #f0f0f0;
+        scrollbar-width: none;
+      }
+      .quick-btn {
+        font-size: 11px;
+        padding: 5px 11px;
+        border: 1px solid #c8d8e8;
+        border-radius: 14px;
+        background: #f0f4f8;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.15s;
+      }
+      .quick-btn:hover {
+        background: #1a3a5c;
+        color: #fff;
+        border-color: #1a3a5c;
+      }
+      .chat-input-row {
+        display: flex;
+        gap: 8px;
+        padding: 10px;
+        border-top: 1px solid #e9ecef;
+        background: #fff;
+      }
+      #chat-input {
+        flex: 1;
+        padding: 9px 13px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      #chat-input:focus {
+        border-color: #2d6a9f;
+      }
+      #chat-send {
+        padding: 9px 16px;
+        background: #1a3a5c;
+        color: #fff;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.15s;
+      }
+      #chat-send:hover {
+        background: #2d6a9f;
+      }
+
+      /* ── Setup ── */
+      .setup-panel {
+        padding-bottom: 20px;
+      }
+      .setup-section {
+        background: #fff;
+        margin: 10px 12px;
+        border-radius: 12px;
+        padding: 14px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+      }
+      .setup-section h3 {
+        font-size: 13px;
+        color: #1a3a5c;
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+      .setup-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .setup-label {
+        font-size: 12px;
+        color: #555;
+      }
+      .status-badge {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .setup-btn {
+        padding: 8px 14px;
+        background: #1a3a5c;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        margin-top: 4px;
+        transition: background 0.15s;
+      }
+      .setup-btn:hover {
+        background: #2d6a9f;
+      }
+      .setup-btn.secondary {
+        background: #6c757d;
+      }
+      .setup-btn.btn-active {
+        background: #27ae60;
+        cursor: default;
+      }
+      .setup-input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 12px;
+        margin-bottom: 8px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .setup-input:focus {
+        border-color: #2d6a9f;
+      }
+
+      /* Account switcher */
+      .account-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        border: 1px solid #e9ecef;
+      }
+      .active-account {
+        background: #f0f8f0;
+        border-color: #27ae60;
+      }
+
+      /* Courses */
+      .course-card {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 9px 10px;
+        margin-bottom: 6px;
+      }
+      .course-info {
+        flex: 1;
+      }
+      .btn-remove-course {
+        background: none;
+        border: none;
+        color: #e74c3c;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0 4px;
+        flex-shrink: 0;
+      }
+
+      /* ── Toast ── */
+      #toast {
+        position: fixed;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: #1a3a5c;
+        color: #fff;
+        padding: 8px 18px;
+        border-radius: 20px;
+        font-size: 12px;
+        opacity: 0;
+        transition: all 0.25s;
+        pointer-events: none;
+        white-space: nowrap;
+        z-index: 9999;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
       }
     </style>
   </head>
   <body>
     <div class="header">
-      <span>🎓</span>
-      <h1>Academic AI Assistant</h1>
-      <span class="version">v0.1</span>
+      <h1>🎓 Academic AI Assistant</h1>
+      <span class="version">v0.3.0</span>
     </div>
 
-    <div class="tabs">
-      <div class="tab active" data-tab="today">📅 Today</div>
-      <div class="tab" data-tab="inbox">📧 Inbox</div>
-      <div class="tab" data-tab="chat">💬 Chat</div>
-      <div class="tab" data-tab="settings">⚙️ Setup</div>
+    <div class="tab-bar">
+      <button class="tab-btn" data-tab="today" id="tab-today">📅 Today</button>
+      <button class="tab-btn" data-tab="inbox" id="tab-inbox">📧 Inbox</button>
+      <button class="tab-btn" data-tab="chat" id="tab-chat">💬 Chat</button>
+      <button class="tab-btn" data-tab="setup" id="tab-setup">⚙️ Setup</button>
     </div>
 
-    <div class="content" id="tab-content"></div>
+    <!-- TODAY PANEL -->
+    <div class="panel" id="panel-today">
+      <div class="empty-state">
+        <span>📅</span>
+        <p>Loading schedule…</p>
+      </div>
+    </div>
 
-    <!-- NO inline scripts allowed in Chrome Extensions — logic is in sidepanel.js -->
+    <!-- INBOX PANEL -->
+    <div class="panel hidden" id="panel-inbox">
+      <div class="empty-state">
+        <span>⏳</span>
+        <p>Loading emails…</p>
+      </div>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="panel hidden" id="panel-chat">
+      <div class="empty-state">
+        <span>💬</span>
+        <p>Loading chat…</p>
+      </div>
+    </div>
+
+    <!-- SETUP PANEL -->
+    <div class="panel hidden setup-panel" id="panel-setup">
+      <!-- Google Account + Account Switcher -->
+      <div class="setup-section">
+        <h3>🔗 Google Accounts</h3>
+        <div class="setup-row">
+          <span class="setup-label">Sync status</span>
+          <span class="status-badge" id="google-status">❓ Unknown</span>
+        </div>
+        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
+          Switch between accounts to load emails from a different inbox (e.g.
+          your university email). Both accounts must be signed into Chrome.
+        </p>
+        <div id="accounts-container">
+          <p style="font-size: 11px; color: #999">Loading accounts…</p>
+        </div>
+        <button
+          class="setup-btn"
+          id="btn-google-connect"
+          style="margin-top: 8px"
+        >
+          🔄 Connect &amp; Sync Active Account
+        </button>
+      </div>
+
+      <!-- Gemini AI -->
+      <div class="setup-section">
+        <h3>🤖 Gemini AI (Free)</h3>
+        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
+          Get your free permanent API key at
+          <a
+            href="https://aistudio.google.com"
+            target="_blank"
+            style="color: #1a3a5c"
+            >aistudio.google.com</a
+          >. Free forever: 10 requests/min, 1,500/day. No expiration.
+        </p>
+        <input
+          class="setup-input"
+          type="password"
+          id="gemini-key"
+          placeholder="AIza…"
+          autocomplete="off"
+        />
+        <button class="setup-btn" id="btn-save-apikey">Save API Key</button>
+      </div>
+
+      <!-- Courses -->
+      <div class="setup-section">
+        <h3>📚 My Courses at BGU</h3>
+        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
+          Add your courses so the AI knows your context and can help you prepare
+          for each lecturer's style.
+        </p>
+        <div id="courses-list"></div>
+        <input
+          class="setup-input"
+          type="text"
+          id="course-name"
+          placeholder="Course name (e.g. חקר ביצועים)"
+        />
+        <input
+          class="setup-input"
+          type="text"
+          id="course-lecturer"
+          placeholder='Lecturer name (e.g. ד"ר כהן)'
+        />
+        <input
+          class="setup-input"
+          type="text"
+          id="course-notes"
+          placeholder="Notes: exam style, main topics, tips…"
+        />
+        <button class="setup-btn" id="btn-add-course">+ Add Course</button>
+      </div>
+
+      <!-- Moodle -->
+      <div class="setup-section">
+        <h3>🎓 Moodle (BGU)</h3>
+        <input
+          class="setup-input"
+          type="url"
+          id="moodle-url"
+          placeholder="https://moodle.bgu.ac.il"
+        />
+        <button class="setup-btn" id="btn-save-moodle">Save Moodle URL</button>
+      </div>
+
+      <!-- Manual Sync -->
+      <div class="setup-section">
+        <h3>🔄 Manual Sync</h3>
+        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
+          Calendar syncs every 15 min · Emails sync every 5 min automatically.
+        </p>
+        <button class="setup-btn secondary" id="btn-sync-now">
+          🔄 Sync Now
+        </button>
+      </div>
+    </div>
+    <!-- /setup panel -->
+
     <script src="sidepanel.js"></script>
   </body>
 </html>

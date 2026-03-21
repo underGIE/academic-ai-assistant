@@ -87,9 +87,63 @@ not just writing code.
 
 ---
 
-## Mission 2 — Google Calendar Integration 🔄
+## Mission 2 — Google Calendar Integration ✅
 
-_(In progress)_
+**Date completed:** March 2026
+**Commit:** `feat: Mission 2 complete — Google Calendar integration working`
+
+### What I built
+
+- Real Google Calendar events showing in the Today tab
+- OAuth 2.0 authentication flow via chrome.identity
+- Live countdown: "in 18h 55m", "Tomorrow at 08:00"
+- Background sync every 15 minutes
+- Chrome notifications scheduled before lectures
+
+### Key concepts I learned
+
+**OAuth 2.0 in practice**
+I implemented the full OAuth flow inside a Chrome Extension.
+Instead of managing redirect URIs and login pages like a web app,
+Chrome extensions use chrome.identity.getAuthToken() which handles
+everything — popup, approval, token caching, and refresh.
+The extension never sees the user's password.
+
+**REST API calls with authentication**
+I called the Google Calendar API directly from JavaScript using
+fetch(). The key pattern: include the OAuth token in the
+Authorization header of every request. If the token expires
+(401 response), clear it with removeCachedAuthToken() and retry.
+
+**Async/Await and Promises**
+Google's chrome.identity uses callbacks (old style). I wrapped it
+in a Promise so I could use modern async/await syntax throughout
+the codebase. This is a common real-world pattern.
+
+**ES Modules in Chrome Extensions**
+Using import/export requires "type": "module" in manifest.json.
+Without it Chrome treats the service worker as a classic script
+and throws: "Cannot use import statement outside a module".
+
+**Problems I solved**
+
+- Status code 15 / import error → added "type": "module" to manifest
+- ESLint showing chrome as undefined → added chrome: 'readonly' to globals
+- ESLint showing import as error → added sourceType: 'module' to parserOptions
+
+```
+
+---
+
+## Your Board
+```
+
+✅ Mission 1 — Extension shell + Git
+✅ Mission 2 — Google Calendar + real data
+🔜 Mission 3 — Gmail + AI Chat ← NEXT
+⬜ Mission 4 — Moodle integration
+⬜ Mission 5 — Smart Lecture Note Agent 🎥
+⬜ Mission 6 — Polish + LinkedIn post
 
 ### What I'm building
 

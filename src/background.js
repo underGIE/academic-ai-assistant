@@ -1,86 +1,81 @@
 // ============================================================
 // BACKGROUND SERVICE WORKER
-// Runs silently in the background — schedules syncs + alarms
 // ============================================================
 import {
   fetchUpcomingEvents,
   scheduleLectureAlarm,
 } from "./calendarService.js";
+import { fetchRecentEmails } from "./gmailService.js";
+import { classifyAll } from "./classifier.js";
 
-// ── Top-level listeners (MV3 requirement) ─────────────────
+function setupAlarms() {
+  chrome.alarms.create("poll-calendar", { periodInMinutes: 15 });
+  chrome.alarms.create("poll-gmail", { periodInMinutes: 5 });
+}
 
-// Listen for manual sync trigger from UI
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "syncCalendar") {
-    syncCalendar().then(() => sendResponse({ ok: true }));
-    return true; // keeps the message channel open for async response
+async function syncCalendar() {
+  try {
+    const events = await fetchUpcomingEvents(7);
+    await chrome.storage.local.set({
+      calendarEvents: events,
+      calendarLastSync: Date.now(),
+    });
+    scheduleLectureAlarm(events);
+    console.log("[BG] Calendar synced:", events.length, "events");
+  } catch (e) {
+    console.error("[BG] Calendar sync failed:", e);
   }
-});
-chrome.runtime.onInstalled.addListener(async () => {
-  console.log("[AcademicAI] Installed ✓");
-  setupAlarms();
+}
+
+async function syncGmail() {
+  try {
+    const raw = await fetchRecentEmails(30);
+    const emails = classifyAll(raw);
+    await chrome.storage.local.set({ emails, gmailLastSync: Date.now() });
+    console.log("[BG] Gmail synced:", emails.length, "emails");
+  } catch (e) {
+    console.error("[BG] Gmail sync failed:", e);
+  }
+}
+
+async function syncAll() {
   await syncCalendar();
-});
+  await syncGmail();
+}
 
-chrome.runtime.onStartup.addListener(async () => {
-  console.log("[AcademicAI] Startup ✓");
+// ── Top-level listeners (MV3 requirement) ──────────────────────────
+chrome.runtime.onInstalled.addListener(() => {
   setupAlarms();
-  await syncCalendar();
+  syncAll();
+});
+chrome.runtime.onStartup.addListener(() => {
+  setupAlarms();
+  syncAll();
 });
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  console.log("[AcademicAI] Alarm fired:", alarm.name);
-
-  // Periodic calendar refresh
-  if (alarm.name === "poll-calendar") {
-    await syncCalendar();
-  }
-
-  // Lecture notification alarm
-  if (alarm.name.startsWith("lecture-")) {
-    const stored = await chrome.storage.local.get(`alarm-${alarm.name}`);
-    const info = stored[`alarm-${alarm.name}`];
-    if (info) {
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "icons/icon48.png",
-        title: "📅 Lecture in 30 minutes",
-        message: `${info.title} · ${info.time}`,
-      });
-    }
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "poll-calendar") syncCalendar();
+  else if (alarm.name === "poll-gmail") syncGmail();
+  else if (alarm.name.startsWith("lecture-")) {
+    const title = alarm.name.replace("lecture-", "");
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icons/icon48.png",
+      title: "📚 Lecture in 30 minutes",
+      message: title,
+    });
   }
 });
 
-// Opens side panel when extension icon is clicked
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ tabId: tab.id });
 });
 
-// ── Register recurring alarms ─────────────────────────────
-function setupAlarms() {
-  chrome.alarms.create("poll-calendar", { periodInMinutes: 15 });
-  chrome.alarms.create("poll-gmail", { periodInMinutes: 5 });
-  console.log("[AcademicAI] Alarms registered ✓");
-}
-
-// ── Fetch and cache calendar events ──────────────────────
-async function syncCalendar() {
-  try {
-    const events = await fetchUpcomingEvents(14);
-
-    // Save to local storage — UI reads from here
-    await chrome.storage.local.set({
-      calendarEvents: events,
-      lastCalendarSync: Date.now(),
-    });
-
-    // Schedule a notification alarm for each upcoming event
-    for (const event of events) {
-      await scheduleLectureAlarm(event, 30);
-    }
-
-    console.log(`[AcademicAI] Synced ${events.length} events ✓`);
-  } catch (err) {
-    console.error("[AcademicAI] Calendar sync failed:", err);
-  }
-}
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "syncCalendar")
+    syncCalendar().then(() => sendResponse({ ok: true }));
+  if (msg.type === "syncGmail")
+    syncGmail().then(() => sendResponse({ ok: true }));
+  if (msg.type === "syncAll") syncAll().then(() => sendResponse({ ok: true }));
+  return true;
+});
