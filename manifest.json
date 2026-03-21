@@ -1,10 +1,15 @@
 {
+  "oauth2": {
+    "client_id": "856203600469-t8oiaao8vmdq5197ockrk9h0aad8jtgb.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/calendar.readonly"]
+  },
   "manifest_version": 3,
   "name": "Academic AI Assistant",
   "version": "0.1.0",
   "description": "AI-powered academic personal secretary — Calendar, Gmail, and Moodle unified",
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

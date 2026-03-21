@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Academic AI Assistant</title>
     <style>
       * {
@@ -20,14 +19,22 @@
       .header {
         background: #1f4e79;
         color: white;
-        padding: 16px 20px;
+        padding: 14px 20px;
         display: flex;
         align-items: center;
         gap: 10px;
       }
       .header h1 {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
+      }
+      .header .version {
+        margin-left: auto;
+        font-size: 10px;
+        opacity: 0.6;
+        background: rgba(255, 255, 255, 0.15);
+        padding: 2px 6px;
+        border-radius: 10px;
       }
       .tabs {
         display: flex;
@@ -38,52 +45,111 @@
         flex: 1;
         padding: 10px 4px;
         text-align: center;
-        font-size: 12px;
+        font-size: 11px;
         cursor: pointer;
         color: #64748b;
-        border-bottom: 2px solid transparent;
+        border-bottom: 3px solid transparent;
         margin-bottom: -2px;
+        transition: all 0.15s;
+      }
+      .tab:hover {
+        background: #f8fafc;
       }
       .tab.active {
         color: #1f4e79;
         border-bottom-color: #1f4e79;
-        font-weight: 600;
+        font-weight: 700;
       }
       .content {
-        padding: 16px;
+        padding: 14px;
       }
       .card {
         background: white;
         border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 14px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
         border-left: 4px solid #2e75b6;
       }
       .card h3 {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
         margin-bottom: 4px;
       }
       .card p {
         font-size: 12px;
         color: #64748b;
+        line-height: 1.5;
       }
       .badge {
         display: inline-block;
         padding: 2px 8px;
-        border-radius: 12px;
+        border-radius: 10px;
         font-size: 11px;
         font-weight: 600;
-        background: #deeaf1;
-        color: #1f4e79;
         margin-top: 8px;
       }
-      .status {
+      .badge-blue {
+        background: #deeaf1;
+        color: #1f4e79;
+      }
+      .badge-green {
+        background: #e2efda;
+        color: #375623;
+      }
+      .badge-orange {
+        background: #fce4d6;
+        color: #843c0c;
+      }
+      .btn {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 7px 14px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: opacity 0.15s;
+      }
+      .btn:hover {
+        opacity: 0.85;
+      }
+      .empty {
         text-align: center;
         padding: 40px 20px;
         color: #94a3b8;
+      }
+      .empty .icon {
+        font-size: 36px;
+        margin-bottom: 10px;
+      }
+      .empty p {
         font-size: 13px;
+      }
+      .empty .sub {
+        font-size: 11px;
+        margin-top: 6px;
+        color: #cbd5e1;
+      }
+      .input {
+        width: 100%;
+        margin-top: 8px;
+        padding: 7px 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 5px;
+        font-size: 12px;
+        outline: none;
+      }
+      .input:focus {
+        border-color: #2e75b6;
+      }
+      .label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+        margin-top: 12px;
+        display: block;
       }
     </style>
   </head>
@@ -91,85 +157,19 @@
     <div class="header">
       <span>🎓</span>
       <h1>Academic AI Assistant</h1>
+      <span class="version">v0.1</span>
     </div>
+
     <div class="tabs">
-      <div class="tab active" onclick="showTab('today')">📅 Today</div>
-      <div class="tab" onclick="showTab('inbox')">📧 Inbox</div>
-      <div class="tab" onclick="showTab('chat')">💬 Chat</div>
-      <div class="tab" onclick="showTab('settings')">⚙️ Settings</div>
-    </div>
-    <div class="content" id="tab-content">
-      <div class="status">
-        <p>📅 Connect your Google account</p>
-        <p style="margin-top: 8px">Go to ⚙️ Settings to get started</p>
-      </div>
+      <div class="tab active" data-tab="today">📅 Today</div>
+      <div class="tab" data-tab="inbox">📧 Inbox</div>
+      <div class="tab" data-tab="chat">💬 Chat</div>
+      <div class="tab" data-tab="settings">⚙️ Setup</div>
     </div>
 
-    <script>
-      const tabs = {
-        today: `
-        <div class="card">
-          <h3>Next Lecture</h3>
-          <p>Connect Google Calendar to see your next lecture</p>
-          <span class="badge">Not connected</span>
-        </div>
-        <div class="card" style="border-left-color: #70AD47">
-          <h3>Upcoming Deadlines</h3>
-          <p>Connect Moodle to see your deadlines</p>
-          <span class="badge" style="background:#E2EFDA;color:#375623">Not connected</span>
-        </div>
-      `,
-        inbox: `
-        <div class="status">
-          <p>📧 Connect Gmail to see classified emails</p>
-        </div>
-      `,
-        chat: `
-        <div class="status">
-          <p>💬 AI Chat coming soon</p>
-          <p style="margin-top:8px">Ask anything about your schedule</p>
-        </div>
-      `,
-        settings: `
-        <div class="card" style="border-left-color:#70AD47">
-          <h3>🔗 Google Account</h3>
-          <p>Connect Calendar + Gmail</p>
-          <button onclick="connectGoogle()" style="margin-top:10px;padding:6px 14px;background:#1F4E79;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">
-            Connect Google
-          </button>
-        </div>
-        <div class="card" style="border-left-color:#FF8C00">
-          <h3>📚 Moodle URL</h3>
-          <p>Paste your Moodle ICS calendar URL</p>
-          <input type="text" placeholder="https://moodle.university.edu/calendar/export..." 
-            style="width:100%;margin-top:8px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" />
-        </div>
-        <div class="card" style="border-left-color:#7B2FBE">
-          <h3>🤖 AI API Key</h3>
-          <p>Your Claude or OpenAI API key</p>
-          <input type="password" placeholder="sk-ant-..." 
-            style="width:100%;margin-top:8px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" />
-        </div>
-      `,
-      };
+    <div class="content" id="tab-content"></div>
 
-      function showTab(name) {
-        document.querySelectorAll(".tab").forEach((t, i) => {
-          t.classList.toggle(
-            "active",
-            ["today", "inbox", "chat", "settings"][i] === name,
-          );
-        });
-        document.getElementById("tab-content").innerHTML = tabs[name];
-      }
-
-      function connectGoogle() {
-        // Will implement with chrome.identity in Mission 2
-        alert("Google OAuth coming in next step!");
-      }
-
-      // Load today tab on start
-      showTab("today");
-    </script>
+    <!-- NO inline scripts allowed in Chrome Extensions — logic is in sidepanel.js -->
+    <script src="sidepanel.js"></script>
   </body>
 </html>
