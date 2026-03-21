@@ -10,6 +10,10 @@ export default [
         ...globals.browser,
         chrome: "readonly", // ← tells ESLint chrome exists in extensions
       },
+      parserOptions: {
+        sourceType: "module", // ← tells ESLint files use import/export
+        ecmaVersion: "latest", // ← allows modern JS syntax
+      },
     },
   },
   pluginJs.configs.recommended,

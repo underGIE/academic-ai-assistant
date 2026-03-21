@@ -1,7 +1,10 @@
 {
   "oauth2": {
     "client_id": "856203600469-t8oiaao8vmdq5197ockrk9h0aad8jtgb.apps.googleusercontent.com",
-    "scopes": ["https://www.googleapis.com/auth/calendar.readonly"]
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
   },
   "manifest_version": 3,
   "name": "Academic AI Assistant",

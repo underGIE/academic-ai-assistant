@@ -104,21 +104,16 @@ export function formatCountdown(event) {
 }
 
 // ── Schedule a Chrome alarm before a lecture ─────────────
-export async function scheduleLectureAlarm(event, minutesBefore = 30) {
-  const start = new Date(event.start?.dateTime || event.start?.date).getTime();
-  const alarmTime = start - minutesBefore * 60 * 1000;
-
-  if (alarmTime <= Date.now()) return; // event already passed
-
-  const alarmName = `lecture-${event.id}`;
-
-  chrome.alarms.create(alarmName, { when: alarmTime });
-
-  // Save event info so the notification knows what to display
-  await chrome.storage.local.set({
-    [`alarm-${alarmName}`]: {
-      title: event.summary || "Lecture",
-      time: formatTime(event),
-    },
+export function scheduleLectureAlarm(events) {
+  const now = Date.now();
+  events.forEach((event) => {
+    const startStr = event.start?.dateTime || event.start?.date;
+    if (!startStr) return;
+    const startTime = new Date(startStr).getTime();
+    if (isNaN(startTime) || !isFinite(startTime)) return; // ← guard added
+    const alarmTime = startTime - 30 * 60 * 1000;
+    if (alarmTime <= now) return;
+    const name = `lecture-${event.summary || "event"}`;
+    chrome.alarms.create(name, { when: alarmTime });
   });
 }
