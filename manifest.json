@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Academic AI Assistant",
+  "version": "0.1.0",
+  "description": "AI-powered academic personal secretary — Calendar, Gmail, and Moodle unified",
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "alarms",
+    "notifications",
+    "identity"
+  ],
+  "host_permissions": ["https://www.googleapis.com/*"],
+  "action": {
+    "default_title": "Academic AI Assistant"
+  }
+}
