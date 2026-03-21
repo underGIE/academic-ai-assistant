@@ -1,50 +1,73 @@
-# 🎓 Academic AI Assistant — Chrome Extension
+# Academic AI Assistant - Chrome Extension
 
-> An AI-powered academic personal secretary that unifies Google Calendar,
-> Gmail, and Moodle into a single smart interface.
+A personal AI-powered academic secretary built as a Chrome Extension.
+Integrates Google Calendar, Gmail, and an AI agent to help BGU students stay on top of academic life.
 
-## 🚀 Project Status
+Version 0.3.0 | Manifest V3
 
-🔨 **In active development** — [Follow progress →](#roadmap)
+---
 
-## 🧠 What It Does
+## Features
 
-Students context-switch between 4+ tools daily. This extension eliminates
-that friction by:
+- Today Tab: Next upcoming event with countdown + full week from Google Calendar
+- Inbox Tab: Gmail sync with Hebrew + English classification - Payment, Admin, Urgent
+- AI Chat: Ask anything about your schedule or emails in Hebrew or English
+- BGU Nerd Friend: AI explains course material with Intuition, Definition, Example, Exam Tip
+- Course Memory: Add courses + lecturers in Setup, AI uses this for exam prep
 
-- 📅 Detecting upcoming lectures and their sequence number
-- 📧 Classifying emails by course, urgency, and required action
-- 📚 Surfacing Moodle deadlines and materials for the next lecture
-- 💬 Answering natural-language questions with cited sources
+---
 
-## 🏗️ Architecture
+## Tech Stack
 
-- **Chrome Manifest V3** — Side Panel + Service Worker
-- **Google Calendar API + Gmail API** — OAuth2 via chrome.identity
-- **Moodle Web Services / ICS** — Course content and deadlines
-- **Claude API (Anthropic)** — AI agent with source-referenced responses
+- Chrome Extension Manifest V3 - Service Worker, Side Panel API, OAuth
+- Google Calendar API - real-time schedule sync
+- Gmail API - inbox sync with rule-based classification
+- Gemini 2.5 Flash - free AI agent, no expiration
+- Vanilla JS + ES Modules - no build step needed
 
-## 🗺️ Roadmap
+---
 
-- [x] Phase 1: Extension shell + Side Panel UI
-- [ ] Phase 2: Google Calendar integration + lecture notifications
-- [ ] Phase 3: Gmail integration + AI-powered email classification
-- [ ] Phase 4: Moodle integration + AI Chat
-- [ ] Phase 5: Smart prioritization engine + MCP layer
+## Getting Started
 
-## 🛠️ Tech Stack
+1. Clone the repo
+2. Enable Calendar API and Gmail API in Google Cloud Console
+3. Create OAuth credentials and add Client ID to manifest.json
+4. Open chrome://extensions, enable Developer mode, click Load unpacked
+5. In Setup tab: connect Google account, add Gemini API key, add your courses
 
-React · Vite · Chrome Extension MV3 · Google APIs · Claude AI
+Free Gemini API key: https://aistudio.google.com
 
-## 📦 Local Development
+---
 
-```bash
-npm install
-npm run dev
-# Load /dist folder as unpacked extension in chrome://extensions
-```
+## Project Structure
 
-## 👤 About
+- manifest.json - Extension config
+- sidepanel.html + sidepanel.js - UI
+- src/background.js - Service worker
+- src/calendarService.js - Google Calendar
+- src/gmailService.js - Gmail
+- src/classifier.js - Email classifier
+- src/aiAgent.js - Gemini AI agent
+- LEARNING_LOG.md - Full learning journal
 
-Built as a learning project to demonstrate systems thinking and
-technical execution. Background in Industrial & Management Engineering.
+---
+
+## Roadmap
+
+- Done: Mission 1 - Chrome Extension foundation
+- Done: Mission 2 - Google Calendar integration
+- Done: Mission 3 - Gmail + AI Chat with BGU context
+- Next: Mission 4 - Moodle integration
+- Next: Mission 5 - Smart Lecture Note Agent
+- Next: Mission 6 - Polish and publish
+
+---
+
+## Learning Log
+
+Every concept, error, and fix documented in LEARNING_LOG.md
+Written to be portfolio-ready for technical interviews.
+
+---
+
+Built by an Industrial & Management Engineering student at Ben-Gurion University of the Negev
