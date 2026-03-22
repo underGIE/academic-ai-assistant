@@ -22,8 +22,14 @@ function getStorage(keys) { return new Promise(r => chrome.storage.local.get(key
 function setStorage(obj)  { return new Promise(r => chrome.storage.local.set(obj, r)); }
 
 // ── Setup all alarms ──────────────────────────────────────────────
+// Rate limit budget (Gemini free tier: 10 RPM, ~500 RPD):
+//   - Email AI scoring: max 8 calls per run, runs every 30 min = max 128 calls/day on emails
+//   - Content agent: only runs on-demand (user clicks "Generate Guide")
+//   - Chat: on user message only
+//   - UX suggestions: every 2 days = ~1 call per 2 days
+// Total worst case: ~130 calls/day, well within 500 RPD.
 export function setupAlarms() {
-  chrome.alarms.create('agent-email',        { periodInMinutes: 5  });
+  chrome.alarms.create('agent-email',        { periodInMinutes: 30 }); // was 5 — 30 is enough
   chrome.alarms.create('agent-notification', { periodInMinutes: 15 });
   chrome.alarms.create('agent-calendar',     { periodInMinutes: 60 });
   chrome.alarms.create('agent-ux',           { periodInMinutes: 60 * 24 * 2 }); // every 2 days

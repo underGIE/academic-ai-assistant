@@ -115,40 +115,71 @@ Respond ONLY with JSON array:
 // ── Main run ─────────────────────────────────────────────────────
 export async function runEmailAgent() {
   console.log('[EmailAgent] Starting…');
-  const { geminiApiKey, emailAgentState = {} } = await getStorage(['geminiApiKey', 'emailAgentState']);
+  const { geminiApiKey, emailAgentState = {}, emailAiScoreCache = {} } =
+    await getStorage(['geminiApiKey', 'emailAgentState', 'emailAiScoreCache']);
 
   let token;
   try { token = await getToken(false); }
   catch { console.warn('[EmailAgent] No auth token, skipping'); return null; }
 
   // Fetch last 3 days of emails
-  const ids     = await gmailList(token, 'newer_than:3d', 40);
+  const ids = await gmailList(token, 'newer_than:3d', 40);
   if (!ids.length) return null;
 
   const details = await Promise.all(ids.slice(0, 30).map(m => gmailGet(token, m.id)));
   const emails  = details.map(parseMsg);
 
-  // Rule scoring first (fast, free)
+  // Rule scoring first (fast, free, always runs)
   const scored = emails.map(email => {
     const { score, category, reason } = ruleScore(email);
     return { ...email, importanceScore: score, category, reason };
   }).filter(e => e.importanceScore > 0); // drop promos
 
-  // AI scoring for borderline emails (score 3-6)
-  const borderline = scored.filter(e => e.importanceScore >= 3 && e.importanceScore <= 6).slice(0, 10);
-  if (borderline.length && geminiApiKey) {
-    const aiResults = await aiScore(borderline, geminiApiKey);
+  // ── AI scoring: only for borderline emails we haven't scored before ──
+  // emailAiScoreCache: { [emailId]: { score, category, aiSummary } }
+  // This prevents re-calling Gemini for the same email on every 5-minute cycle.
+  const needsAiScore = scored.filter(e =>
+    e.importanceScore >= 3 &&
+    e.importanceScore <= 6 &&
+    !emailAiScoreCache[e.id]   // ← KEY: skip if we already scored this email
+  ).slice(0, 8); // max 8 per run to protect quota
+
+  if (needsAiScore.length && geminiApiKey) {
+    console.log(`[EmailAgent] AI scoring ${needsAiScore.length} new borderline emails`);
+    const aiResults = await aiScore(needsAiScore, geminiApiKey);
     if (Array.isArray(aiResults)) {
       aiResults.forEach(r => {
-        const email = borderline[r.index - 1];
+        const email = needsAiScore[r.index - 1];
         if (email) {
           email.importanceScore = r.score;
           email.category        = r.category || email.category;
           email.aiSummary       = r.summary;
+          // Cache this score so we never call Gemini for this email again
+          emailAiScoreCache[email.id] = {
+            score:     r.score,
+            category:  r.category,
+            aiSummary: r.summary
+          };
         }
       });
+      // Persist the cache (keep last 500 entries)
+      const cacheEntries = Object.entries(emailAiScoreCache);
+      const trimmedCache = Object.fromEntries(cacheEntries.slice(-500));
+      await setStorage({ emailAiScoreCache: trimmedCache });
     }
+  } else if (needsAiScore.length === 0) {
+    console.log('[EmailAgent] All borderline emails already scored — no API calls needed');
   }
+
+  // Apply cached AI scores to emails that were previously scored
+  scored.forEach(email => {
+    const cached = emailAiScoreCache[email.id];
+    if (cached && !email.aiSummary) {
+      email.importanceScore = cached.score;
+      email.category        = cached.category || email.category;
+      email.aiSummary       = cached.aiSummary;
+    }
+  });
 
   // Sort by importance
   scored.sort((a, b) => b.importanceScore - a.importanceScore);
@@ -164,7 +195,7 @@ export async function runEmailAgent() {
   // Save results
   const newState = {
     notified: [...alreadyNotified, ...toNotify.map(e => e.id)].slice(-100),
-    lastRun: Date.now()
+    lastRun:  Date.now()
   };
 
   await setStorage({

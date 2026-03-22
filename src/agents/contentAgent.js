@@ -76,11 +76,24 @@ Format your response EXACTLY like this:
   return callGemini(prompt, apiKey);
 }
 
+// ── Content fingerprint for cache invalidation ───────────────────
+// Only regenerate if the course content actually changed (new sections/files).
+// We do NOT use lastSync timestamp — that changes every Moodle sync and
+// would cause a full re-summarization every hour, burning the entire API quota.
+function courseFingerprint(detail) {
+  const sectionCount = detail.sections?.length || 0;
+  const itemCount    = detail.sections?.reduce((n, s) => n + (s.items?.length || 0), 0) || 0;
+  const fileCount    = detail.files?.length || 0;
+  return `${detail.courseId}_s${sectionCount}_i${itemCount}_f${fileCount}`;
+}
+
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — regenerate weekly at most
+
 // ── Main run ─────────────────────────────────────────────────────
 export async function runContentAgent(onProgress) {
   console.log('[ContentAgent] Starting…');
-  const { geminiApiKey, moodleData, contentAgentCache = {} } =
-    await getStorage(['geminiApiKey', 'moodleData', 'contentAgentCache']);
+  const { geminiApiKey, moodleData, courseStudyGuides = {} } =
+    await getStorage(['geminiApiKey', 'moodleData', 'courseStudyGuides']);
 
   if (!geminiApiKey) {
     console.warn('[ContentAgent] No API key, skipping');
@@ -91,55 +104,56 @@ export async function runContentAgent(onProgress) {
     return null;
   }
 
-  const summaries   = { ...contentAgentCache };
+  const guides      = { ...courseStudyGuides };
   const details     = moodleData.courseDetails || [];
   const assignments = moodleData.assignments   || [];
   const total       = details.length;
+  const now         = Date.now();
 
   for (let i = 0; i < details.length; i++) {
-    const detail  = details[i];
-    const cacheKey = `${detail.courseId}_${moodleData.lastSync}`;
+    const detail      = details[i];
+    const fingerprint = courseFingerprint(detail);
+    const existing    = guides[detail.courseId];
 
-    // Skip if already summarized in this sync cycle
-    if (summaries[cacheKey]) {
-      onProgress?.(`Skipping ${detail.courseName} (cached)`, Math.round(((i+1)/total)*100));
+    // ── Cache hit: skip if fingerprint matches AND within TTL ──
+    if (existing?.fingerprint === fingerprint &&
+        existing?.generatedAt &&
+        (now - existing.generatedAt) < CACHE_TTL_MS) {
+      onProgress?.(`${detail.courseName} — cached ✓`, Math.round(((i+1)/total)*100));
+      console.log(`[ContentAgent] Cache hit for ${detail.courseName}`);
       continue;
     }
 
-    onProgress?.(`Summarizing ${detail.courseName}…`, Math.round(((i+1)/total)*100));
+    onProgress?.(`Generating guide: ${detail.courseName}…`, Math.round(((i+1)/total)*100));
+    console.log(`[ContentAgent] Generating for ${detail.courseName} (fingerprint: ${fingerprint})`);
 
     const courseAssigns = assignments.filter(a => a.courseId === detail.courseId);
     try {
       const summary = await summarizeCourse(detail, courseAssigns, geminiApiKey);
-      summaries[cacheKey] = {
-        courseId:   detail.courseId,
-        courseName: detail.courseName,
+      guides[detail.courseId] = {
+        courseId:    detail.courseId,
+        courseName:  detail.courseName,
         summary,
-        generatedAt: Date.now()
+        fingerprint,             // ← content hash, not timestamp
+        generatedAt: now
       };
-      // Save incrementally so progress isn't lost if it crashes
-      await setStorage({ contentAgentCache: summaries });
+      // Save after each course so progress isn't lost on crash
+      await setStorage({ courseStudyGuides: guides });
     } catch (e) {
       console.warn(`[ContentAgent] Failed for ${detail.courseName}:`, e.message);
+      if (e.message?.includes('429') || e.message?.includes('quota')) {
+        console.warn('[ContentAgent] Rate limit hit — stopping, will resume next run');
+        break; // stop gracefully instead of hammering the API
+      }
     }
 
-    // Small delay to respect Gemini rate limits (10 RPM free tier)
-    await new Promise(r => setTimeout(r, 6500));
+    // 7-second delay = max ~8 RPM, safely under the 10 RPM free tier limit
+    await new Promise(r => setTimeout(r, 7000));
   }
 
-  // Build the final output map: courseId → summary text
-  const courseStudyGuides = {};
-  Object.values(summaries).forEach(entry => {
-    if (entry.courseId) courseStudyGuides[entry.courseId] = entry;
-  });
-
-  await setStorage({
-    courseStudyGuides,
-    contentAgentLastRun: Date.now()
-  });
-
-  console.log(`[ContentAgent] Done: ${Object.keys(courseStudyGuides).length} course summaries`);
-  return courseStudyGuides;
+  await setStorage({ contentAgentLastRun: now });
+  console.log(`[ContentAgent] Done: ${Object.keys(guides).length} course guides cached`);
+  return guides;
 }
 
 // ── Get summary for a single course (called from Moodle tab UI) ──

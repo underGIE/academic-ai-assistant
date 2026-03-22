@@ -231,10 +231,20 @@ export async function fullMoodleSync(onProgress) {
     );
   }
 
-  const courses = rawCourses.map((c) => ({
+  // Filter out courses that are clearly finished (100% progress).
+  // Keep courses with no progress data (progress=null) — those are often newly added.
+  const activeCourses = rawCourses.filter(c => {
+    if (c.progress === null || c.progress === undefined) return true; // no data = keep
+    return c.progress < 100; // exclude completed courses from past semesters
+  });
+
+  // If filtering removed everything (shouldn't happen), fall back to all
+  const coursesToMap = activeCourses.length > 0 ? activeCourses : rawCourses;
+
+  const courses = coursesToMap.map((c) => ({
     id:       String(c.id),
     name:     c.fullname || c.shortname || `Course ${c.id}`,
-    progress: c.progress || 0,
+    progress: c.progress ?? 0,
     url:      `${MOODLE_BASE}/course/view.php?id=${c.id}`,
   }));
 
