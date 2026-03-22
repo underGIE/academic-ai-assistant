@@ -453,13 +453,108 @@ function addMsg(role,text,loading=false){
 function updateMsg(id,text){const el=document.getElementById(id);if(el){el.textContent=text;el.classList.remove('msg-loading');}}
 function appendRefs(id,html){const el=document.getElementById(id);if(el){const r=document.createElement('div');r.style.marginTop='5px';r.innerHTML=html;el.appendChild(r);}}
 
+// ── BGU EMAIL — OAuth via launchWebAuthFlow ───────────────────────
+// Uses implicit token flow (response_type=token) so no client secret is needed.
+// The access token expires in 1 hour; we silently refresh it each time the
+// extension opens. If silent refresh fails the user gets a "reconnect" prompt.
+const GMAIL_SCOPE    = 'https://www.googleapis.com/auth/gmail.readonly';
+const CLIENT_ID      = '856203600469-t8oiaao8vmdq5197ockrk9h0aad8jtgb.apps.googleusercontent.com';
+const REDIRECT_URI   = `https://${chrome.runtime.id}.chromiumapp.org/`;
+
+async function launchBGUOAuth(interactive = true) {
+  const params = new URLSearchParams({
+    client_id:     CLIENT_ID,
+    redirect_uri:  REDIRECT_URI,
+    response_type: 'token',
+    scope:         GMAIL_SCOPE,
+    prompt:        interactive ? 'select_account' : 'none', // 'none' = silent refresh
+  });
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({ url: authUrl, interactive }, (redirectUrl) => {
+      if (chrome.runtime.lastError || !redirectUrl) {
+        return reject(new Error(chrome.runtime.lastError?.message || 'Auth cancelled'));
+      }
+      // Token is in the URL fragment: #access_token=...&expires_in=3600&...
+      const hash   = new URL(redirectUrl).hash.slice(1);
+      const parsed = new URLSearchParams(hash);
+      const token  = parsed.get('access_token');
+      const expiry = Date.now() + Number(parsed.get('expires_in') || 3600) * 1000;
+      if (!token) return reject(new Error('No token in response'));
+      resolve({ token, expiry });
+    });
+  });
+}
+
+async function connectBGUEmail() {
+  const statusEl = document.getElementById('bgu-email-status');
+  if (statusEl) { statusEl.textContent = '🔄 Connecting…'; statusEl.style.color = '#888'; }
+  try {
+    const { token, expiry } = await launchBGUOAuth(true);
+    // Fetch the account email to confirm which account was connected
+    const profileRes = await fetch('https://www.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const profile = await profileRes.json();
+    const email   = profile.emailAddress || 'BGU account';
+    await set({ bguEmailToken: token, bguEmailExpiry: expiry, bguEmailAddress: email });
+    showToast(`✅ ${email} connected!`);
+    loadSetupTab(); // refresh UI
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = '❌ Failed — try again'; statusEl.style.color = '#e74c3c'; }
+    showToast('BGU connect failed: ' + e.message);
+  }
+}
+
+// Try silent token refresh — called when the extension opens
+async function refreshBGUTokenIfNeeded() {
+  const { bguEmailToken, bguEmailExpiry } = await get(['bguEmailToken','bguEmailExpiry']);
+  if (!bguEmailToken) return; // not connected
+  const expiresIn = (bguEmailExpiry || 0) - Date.now();
+  if (expiresIn > 5 * 60 * 1000) return; // still valid for >5 min, nothing to do
+  // Try silent refresh
+  try {
+    const { token, expiry } = await launchBGUOAuth(false);
+    await set({ bguEmailToken: token, bguEmailExpiry: expiry });
+    console.log('[BGU] Token silently refreshed');
+  } catch {
+    // Silent refresh failed (user logged out). Keep old token for now,
+    // emailAgent will fail gracefully and the Setup tab will show reconnect prompt.
+    console.warn('[BGU] Silent token refresh failed — user may need to reconnect');
+  }
+}
+
 // ── SETUP ─────────────────────────────────────────────────────────
 async function loadSetupTab() {
-  const { googleConnected, geminiApiKey, moodleData, moodleConnected, uxSuggestions=[] } =
-    await get(['googleConnected','geminiApiKey','moodleData','moodleConnected','uxSuggestions']);
+  const { googleConnected, geminiApiKey, moodleData, moodleConnected,
+          uxSuggestions=[], bguEmailAddress, bguEmailToken, bguEmailExpiry } =
+    await get(['googleConnected','geminiApiKey','moodleData','moodleConnected',
+               'uxSuggestions','bguEmailAddress','bguEmailToken','bguEmailExpiry']);
 
   const gEl=document.getElementById('google-status');
   if(gEl) gEl.textContent=googleConnected?'✅ Connected':'❌ Not connected';
+
+  // BGU email status
+  const bEl = document.getElementById('bgu-email-status');
+  const discBtn = document.getElementById('btn-bgu-disconnect');
+  if (bEl) {
+    const isConnected = bguEmailToken && bguEmailExpiry > Date.now() - 3600000;
+    if (isConnected && bguEmailAddress) {
+      bEl.textContent  = `✅ ${bguEmailAddress}`;
+      bEl.style.color  = '#27ae60';
+      if (discBtn) discBtn.style.display = 'inline-block';
+    } else if (bguEmailToken) {
+      // Token exists but may be expired
+      bEl.textContent = '⚠️ Token expired — reconnect';
+      bEl.style.color = '#e67e22';
+      if (discBtn) discBtn.style.display = 'none';
+    } else {
+      bEl.textContent = '❌ Not connected';
+      bEl.style.color = '#e74c3c';
+      if (discBtn) discBtn.style.display = 'none';
+    }
+  }
 
   const mEl=document.getElementById('moodle-setup-status');
   if(mEl){
@@ -524,6 +619,12 @@ function attachSetupListeners(){
     try{ await chrome.runtime.sendMessage({type:'syncAll'}); await set({googleConnected:true}); el.textContent='✅ Connected'; loadInboxTab(); }
     catch(e){ el.textContent='❌ '+e.message; }
   });
+  document.getElementById('btn-bgu-connect')?.addEventListener('click', connectBGUEmail);
+  document.getElementById('btn-bgu-disconnect')?.addEventListener('click', async()=>{
+    await set({ bguEmailToken: null, bguEmailExpiry: null, bguEmailAddress: null });
+    showToast('BGU email disconnected');
+    loadSetupTab();
+  });
   document.getElementById('btn-save-apikey')?.addEventListener('click',async()=>{
     const key=document.getElementById('gemini-key')?.value.trim();
     if(key){
@@ -568,4 +669,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   attachSetupListeners();
   document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));
   showTab('today');
+  // Silently refresh BGU token in the background if it's about to expire
+  refreshBGUTokenIfNeeded().catch(()=>{});
 });

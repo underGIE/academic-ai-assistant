@@ -191,12 +191,27 @@
   <div class="panel hidden setup-panel" id="panel-setup">
 
     <div class="setup-section">
-      <h3>🔗 Google Account</h3>
+      <h3>🔗 Google Account (Primary)</h3>
+      <p style="font-size:10px;color:#888;margin-bottom:7px">Calendar + Gmail for your main Google account</p>
       <div class="setup-row">
         <span class="setup-label">Status</span>
         <span id="google-status" style="font-size:11px;font-weight:600">❓ Unknown</span>
       </div>
       <button class="setup-btn" id="btn-google-connect">🔄 Connect &amp; Sync Google</button>
+    </div>
+
+    <div class="setup-section">
+      <h3>📧 BGU Email (Second Account)</h3>
+      <p style="font-size:10px;color:#888;margin-bottom:7px">
+        Connect your <strong>@post.bgu.ac.il</strong> account so the extension reads both inboxes.
+        A Google sign-in popup will open — choose your BGU account.
+      </p>
+      <div class="setup-row">
+        <span class="setup-label">Status</span>
+        <span id="bgu-email-status" style="font-size:11px;font-weight:600;color:#e74c3c">❌ Not connected</span>
+      </div>
+      <button class="setup-btn" id="btn-bgu-connect" style="margin-right:6px">🎓 Connect BGU Email</button>
+      <button class="setup-btn secondary" id="btn-bgu-disconnect" style="display:none">✕ Disconnect</button>
     </div>
 
     <div class="setup-section">

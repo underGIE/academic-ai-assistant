@@ -112,27 +112,68 @@ Respond ONLY with JSON array:
   }
 }
 
+// ── Fetch emails from one account (given a token) ─────────────────
+async function fetchEmailsForToken(token, accountLabel = '') {
+  try {
+    const ids     = await gmailList(token, 'newer_than:3d', 40);
+    if (!ids.length) return [];
+    const details = await Promise.all(ids.slice(0, 30).map(m => gmailGet(token, m.id)));
+    return details.map(raw => ({ ...parseMsg(raw), account: accountLabel }));
+  } catch (e) {
+    console.warn(`[EmailAgent] Failed to fetch ${accountLabel} emails:`, e.message);
+    return [];
+  }
+}
+
 // ── Main run ─────────────────────────────────────────────────────
 export async function runEmailAgent() {
   console.log('[EmailAgent] Starting…');
-  const { geminiApiKey, emailAgentState = {}, emailAiScoreCache = {} } =
-    await getStorage(['geminiApiKey', 'emailAgentState', 'emailAiScoreCache']);
+  const { geminiApiKey, emailAgentState = {}, emailAiScoreCache = {},
+          bguEmailToken, bguEmailExpiry, bguEmailAddress } =
+    await getStorage(['geminiApiKey', 'emailAgentState', 'emailAiScoreCache',
+                      'bguEmailToken', 'bguEmailExpiry', 'bguEmailAddress']);
 
-  let token;
-  try { token = await getToken(false); }
-  catch { console.warn('[EmailAgent] No auth token, skipping'); return null; }
+  // ── Primary account (Chrome-profile Google account) ──────────────
+  let primaryEmails = [];
+  try {
+    const token  = await getToken(false);
+    primaryEmails = await fetchEmailsForToken(token, 'primary');
+  } catch {
+    console.warn('[EmailAgent] No primary auth token');
+  }
 
-  // Fetch last 3 days of emails
-  const ids = await gmailList(token, 'newer_than:3d', 40);
-  if (!ids.length) return null;
+  // ── Secondary account (BGU @post.bgu.ac.il) ──────────────────────
+  let bguEmails = [];
+  if (bguEmailToken && bguEmailExpiry > Date.now()) {
+    console.log(`[EmailAgent] Fetching BGU inbox: ${bguEmailAddress}`);
+    bguEmails = await fetchEmailsForToken(bguEmailToken, 'bgu');
+    // Give BGU emails a pre-score boost so they're prioritised correctly
+    bguEmails.forEach(e => { e._isBGU = true; });
+  } else if (bguEmailToken) {
+    console.warn('[EmailAgent] BGU token expired — skipping BGU inbox');
+  }
 
-  const details = await Promise.all(ids.slice(0, 30).map(m => gmailGet(token, m.id)));
-  const emails  = details.map(parseMsg);
+  // ── Merge, deduplicate by email ID ───────────────────────────────
+  const seen   = new Set();
+  const emails = [...primaryEmails, ...bguEmails].filter(e => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+
+  if (!emails.length) {
+    console.log('[EmailAgent] No emails fetched from any account');
+    return null;
+  }
+  console.log(`[EmailAgent] ${primaryEmails.length} primary + ${bguEmails.length} BGU = ${emails.length} total`);
 
   // Rule scoring first (fast, free, always runs)
   const scored = emails.map(email => {
     const { score, category, reason } = ruleScore(email);
-    return { ...email, importanceScore: score, category, reason };
+    // BGU account emails get an extra +2 even if their From header doesn't show bgu.ac.il
+    // (BGU Workspace emails sometimes use google workspace routing)
+    const bguBonus = email._isBGU && !email.from.includes('bgu.ac.il') ? 2 : 0;
+    return { ...email, importanceScore: Math.min(score + bguBonus, 10), category, reason };
   }).filter(e => e.importanceScore > 0); // drop promos
 
   // ── AI scoring: only for borderline emails we haven't scored before ──
