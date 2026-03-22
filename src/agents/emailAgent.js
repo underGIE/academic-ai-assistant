@@ -5,8 +5,9 @@
  * and decides which ones deserve a popup notification.
  */
 
+import { callGemini } from '../gemini.js';
+
 const GMAIL_BASE = 'https://www.googleapis.com/gmail/v1/users/me';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 // ── Keywords for fast rule-based scoring ─────────────────────────
 const URGENT_WORDS   = ['דחוף','מיידי','urgent','asap','deadline','חשוב מאוד','immediately'];
@@ -84,7 +85,7 @@ function ruleScore(email) {
 
 // ── Gemini AI scoring for borderline emails ───────────────────────
 async function aiScore(emails, apiKey) {
-  if (!apiKey || !emails.length) return {};
+  if (!apiKey || !emails.length) return [];
 
   const prompt = `You are classifying university student emails for importance.
 Score each email 0-10 (10=most important) and classify it.
@@ -97,17 +98,11 @@ Respond ONLY with JSON array:
 [{"index":1,"score":7,"category":"exam","summary":"Brief 1-line summary in same language as email"}]`;
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 500 } })
-    });
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    const text = await callGemini(prompt, apiKey, { temperature: 0.1, maxOutputTokens: 500 });
     const json = text.match(/\[[\s\S]*\]/)?.[0];
     return json ? JSON.parse(json) : [];
-  } catch {
+  } catch (e) {
+    console.warn('[EmailAgent] AI score failed:', e.message);
     return [];
   }
 }

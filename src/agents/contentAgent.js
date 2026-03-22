@@ -11,24 +11,10 @@
  * (no external links as primary experience).
  */
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+import { callGemini } from '../gemini.js';
 
 function getStorage(keys) { return new Promise(r => chrome.storage.local.get(keys, r)); }
 function setStorage(obj)  { return new Promise(r => chrome.storage.local.set(obj, r)); }
-
-async function callGemini(prompt, apiKey) {
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1200 }
-    })
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-}
 
 // ── Build a study summary for one course ─────────────────────────
 async function summarizeCourse(courseDetail, assignments, apiKey) {
@@ -73,7 +59,7 @@ Format your response EXACTLY like this:
 ## ⚡ טיפ מהיר
 [One key insight that helps understand the core idea of this course]`;
 
-  return callGemini(prompt, apiKey);
+  return callGemini(prompt, apiKey, { temperature: 0.3, maxOutputTokens: 1200 });
 }
 
 // ── Content fingerprint for cache invalidation ───────────────────

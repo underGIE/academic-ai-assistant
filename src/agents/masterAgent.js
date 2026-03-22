@@ -5,7 +5,7 @@
  * Assembles full RAG context and answers as a brilliant BGU nerd friend.
  */
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+import { callGemini } from '../gemini.js';
 
 function getStorage(keys) { return new Promise(r => chrome.storage.local.get(keys, r)); }
 function setStorage(obj)  { return new Promise(r => chrome.storage.local.set(obj, r)); }
@@ -153,21 +153,6 @@ ${question}
 - Keep it practical. The student is busy.`;
 }
 
-// ── Gemini call ──────────────────────────────────────────────────
-async function callGemini(prompt, apiKey) {
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 1500 }
-    })
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
-}
-
 function parseRefs(text) {
   const refs = [];
   const patterns = [
@@ -197,7 +182,7 @@ export async function askMaster(question, conversationHistory = []) {
 
   const ctx    = await assembleContext();
   const prompt = buildMasterPrompt(question, ctx, conversationHistory);
-  const text   = await callGemini(prompt, geminiApiKey);
+  const text   = await callGemini(prompt, geminiApiKey, { temperature: 0.4, maxOutputTokens: 1500 });
   const refs   = parseRefs(text);
 
   // Save conversation to history
@@ -232,16 +217,7 @@ Respond ONLY with JSON:
 [{"title":"Feature name","description":"What it does and why it helps","priority":"high|medium|low"}]`;
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.5, maxOutputTokens: 400 }
-      })
-    });
-    const data    = await res.json();
-    const text    = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    const text    = await callGemini(prompt, geminiApiKey, { temperature: 0.5, maxOutputTokens: 400 });
     const json    = text.match(/\[[\s\S]*\]/)?.[0];
     const parsed  = json ? JSON.parse(json) : [];
     const newSuggestions = parsed.map(s => ({ ...s, id: Date.now() + Math.random(), status: 'pending' }));
