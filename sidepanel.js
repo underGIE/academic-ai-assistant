@@ -398,9 +398,23 @@ function loadChatTab() {
       <button id="chat-send">שלח</button>
     </div>`;
 
-  addMsg('assistant','👋 שלום! אני הסוכן הראשי שלך — מחובר לכל הנתונים: לוח זמנים, מיילים, קורסי המודל, ומשימות. שאל אותי כל דבר!');
-
-  get(['conversationHistory']).then(({conversationHistory:h=[]})=>{ conversationHistory=h; });
+  // Check API key BEFORE showing welcome — clear guidance if missing
+  get(['geminiApiKey','conversationHistory']).then(({geminiApiKey, conversationHistory:h=[]})=>{
+    conversationHistory = h;
+    if (!geminiApiKey) {
+      addMsg('assistant','👋 שלום! כדי להפעיל אותי, הוסף את מפתח Gemini API בלשונית ⚙️ Setup → שמור → חזור לכאן.');
+      document.getElementById('chat-input').disabled = true;
+      document.getElementById('chat-send').disabled  = true;
+      // Link to setup tab
+      const btn = document.createElement('button');
+      btn.className = 'quick-btn'; btn.style.marginTop = '6px';
+      btn.textContent = '⚙️ פתח Setup';
+      btn.addEventListener('click', () => showTab('setup'));
+      document.querySelector('.quick-prompts').prepend(btn);
+    } else {
+      addMsg('assistant','👋 שלום! אני הסוכן הראשי שלך — מחובר לכל הנתונים: לוח זמנים, מיילים, קורסי המודל, ומשימות. שאל אותי כל דבר!');
+    }
+  });
 
   const input=document.getElementById('chat-input');
   const send =document.getElementById('chat-send');
@@ -512,7 +526,16 @@ function attachSetupListeners(){
   });
   document.getElementById('btn-save-apikey')?.addEventListener('click',async()=>{
     const key=document.getElementById('gemini-key')?.value.trim();
-    if(key){await set({geminiApiKey:key});showToast('API key saved ✅');}
+    if(key){
+      await set({geminiApiKey:key});
+      showToast('API key saved ✅');
+      // If chat was blocked waiting for key, reset so it reloads properly
+      chatLoaded = false;
+      const input = document.getElementById('chat-input');
+      const send  = document.getElementById('chat-send');
+      if(input) input.disabled = false;
+      if(send)  send.disabled  = false;
+    }
   });
   document.getElementById('btn-go-moodle')?.addEventListener('click',()=>showTab('moodle'));
   document.getElementById('btn-add-course')?.addEventListener('click',async()=>{

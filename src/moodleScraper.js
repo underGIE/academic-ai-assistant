@@ -1,251 +1,316 @@
 // Moodle Scraper — browser context only (sidepanel, NOT service worker)
-// Uses fetch with credentials to access pages the user is already logged in to
-// BGU Moodle: https://moodle.bgu.ac.il/moodle
+// Uses BGU's session cookies + Moodle AJAX API for reliable data extraction.
+// Key insight: the /my/ dashboard course list is AJAX-rendered, so we call
+// Moodle's built-in AJAX endpoints directly instead of trying to parse the DOM.
 
-const MOODLE_BASE = "https://moodle.bgu.ac.il/moodle";
+const MOODLE_BASE = 'https://moodle.bgu.ac.il/moodle';
 
 // ── Core fetch helper ────────────────────────────────────────────
 async function fetchMoodlePage(path) {
-  const url = path.startsWith("http") ? path : `${MOODLE_BASE}${path}`;
+  const url = path.startsWith('http') ? path : `${MOODLE_BASE}${path}`;
   const res = await fetch(url, {
-    credentials: "include", // sends BGU login cookies
-    headers: { Accept: "text/html" },
+    credentials: 'include',
+    headers: { Accept: 'text/html' },
   });
-  if (res.status === 303 || res.url.includes("login")) {
-    throw new Error("NOT_LOGGED_IN");
+  // BGU redirects to local/mydashboard or login if not authenticated
+  if (
+    res.url.includes('/login/') ||
+    res.url.includes('local/mydashboard') ||
+    res.status === 303
+  ) {
+    throw new Error('NOT_LOGGED_IN');
   }
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   const html = await res.text();
-  return new DOMParser().parseFromString(html, "text/html");
+  return { doc: new DOMParser().parseFromString(html, 'text/html'), html };
 }
 
 function cleanText(el) {
-  return el?.textContent?.replace(/\s+/g, " ").trim() || "";
+  return el?.textContent?.replace(/\s+/g, ' ').trim() || '';
 }
 
-// ── 1. Dashboard — get enrolled course list ───────────────────────
-export async function scrapeDashboard() {
-  const doc = await fetchMoodlePage("/my/");
-
-  const courses = [];
-  const seen = new Set();
-
-  // Multiple selectors to handle different Moodle themes
-  const selectors = [
-    'a[href*="course/view.php?id="]',
-    ".coursename a",
-    ".course-info-container a",
-    '[data-region="course-content"] a',
+// ── Extract sesskey from any Moodle page ─────────────────────────
+// The sesskey is Moodle's CSRF token embedded in every page as JSON config.
+// Without it the AJAX endpoints return an error.
+function extractSesskey(html) {
+  const patterns = [
+    /"sesskey":"([a-zA-Z0-9]+)"/,
+    /M\.cfg\.sesskey\s*=\s*["']([^"']+)["']/,
+    /name="sesskey"\s+value="([^"]+)"/,
+    /"sesskey\\?":\\?"([a-zA-Z0-9]+)\\?"/,
   ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
 
-  for (const sel of selectors) {
-    doc.querySelectorAll(sel).forEach((link) => {
-      const match = link.href?.match(/course\/view\.php\?id=(\d+)/);
-      if (!match || seen.has(match[1])) return;
-      seen.add(match[1]);
+// ── Moodle AJAX helper ────────────────────────────────────────────
+// Calls Moodle's built-in lib/ajax/service.php endpoint.
+// This is the same API Moodle's own JavaScript uses — always available when logged in.
+async function moodleAjax(sesskey, methodname, args) {
+  const url = `${MOODLE_BASE}/lib/ajax/service.php?sesskey=${sesskey}&info=${methodname}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ index: 0, methodname, args }]),
+  });
+  if (!res.ok) throw new Error(`AJAX HTTP ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error('Unexpected AJAX response');
+  if (data[0]?.error) {
+    throw new Error(data[0].exception?.message || data[0].error || 'AJAX error');
+  }
+  return data[0].data;
+}
 
-      const name =
-        cleanText(link.querySelector(".coursename, .multiline")) ||
-        link.getAttribute("title") ||
-        cleanText(link) ||
-        `Course ${match[1]}`;
+// ── 1. Get sesskey (required for all AJAX calls) ──────────────────
+async function getSesskey() {
+  // Try /my/ first (the student dashboard)
+  try {
+    const { html } = await fetchMoodlePage('/my/');
+    const key = extractSesskey(html);
+    if (key) return key;
+  } catch (e) {
+    if (e.message === 'NOT_LOGGED_IN') throw e;
+  }
+  // Fallback: any course page also has sesskey
+  const { html } = await fetchMoodlePage('/');
+  const key = extractSesskey(html);
+  if (!key) throw new Error('Could not find Moodle session key — try refreshing BGU Moodle');
+  return key;
+}
 
-      if (name.length > 2) {
-        courses.push({ id: match[1], name: name.slice(0, 80) });
-      }
-    });
+// ── 2. Get enrolled courses via AJAX ─────────────────────────────
+// Uses core_course_get_enrolled_courses_by_timeline_classification
+// Returns actual enrolled course objects with id, fullname, progress, etc.
+async function fetchEnrolledCourses(sesskey) {
+  // Try 'inprogress' first (current semester) — cleanest result
+  try {
+    const result = await moodleAjax(
+      sesskey,
+      'core_course_get_enrolled_courses_by_timeline_classification',
+      { offset: 0, limit: 50, classification: 'inprogress', sort: 'fullname' }
+    );
+    const courses = result?.courses || [];
+    if (courses.length > 0) return courses;
+  } catch (e) {
+    console.warn('[Moodle] inprogress failed, trying all:', e.message);
   }
 
-  // Deduplicate by ID
-  const unique = Object.values(
-    Object.fromEntries(courses.map((c) => [c.id, c])),
+  // Fallback: get all courses
+  const result = await moodleAjax(
+    sesskey,
+    'core_course_get_enrolled_courses_by_timeline_classification',
+    { offset: 0, limit: 50, classification: 'all', sort: 'fullname' }
   );
-
-  return unique;
+  return result?.courses || [];
 }
 
-// ── 2. Course page — get sections, files, assignments ─────────────
-export async function scrapeCourse(courseId) {
-  const doc = await fetchMoodlePage(`/course/view.php?id=${courseId}`);
+// ── 3. Get upcoming deadlines via AJAX calendar ───────────────────
+// Uses core_calendar_get_action_events_by_timesort
+// Returns actual deadline timestamps — no more text parsing guesswork.
+async function fetchUpcomingDeadlines(sesskey) {
+  const now    = Math.floor(Date.now() / 1000);
+  const future = now + 90 * 24 * 3600; // 90 days ahead
 
-  // Course title
-  const courseName =
-    cleanText(doc.querySelector("h1.page-header-headings, h1, .page-title")) ||
-    `Course ${courseId}`;
-
-  // Sections (weekly or topic format)
-  const sections = [];
-  const sectionEls = doc.querySelectorAll(
-    'li[id^="section-"], .section.main, .topics .section, .weeks .section',
-  );
-
-  sectionEls.forEach((sec) => {
-    const title =
-      cleanText(
-        sec.querySelector(".sectionname, .section-title h3, h3.sectionname"),
-      ) || "Section";
-
-    const items = [];
-
-    // Activities (assignments, resources, videos, etc.)
-    sec.querySelectorAll("li.activity, .activityinstance").forEach((act) => {
-      const nameEl = act.querySelector(".instancename, .activityname, a");
-      const name = cleanText(nameEl)
-        ?.replace(/\s*(פתח|Open)\s*$/, "")
-        .trim();
-      const typeMatch = act.className?.match(/modtype_(\w+)/);
-      const type = typeMatch ? typeMatch[1] : "unknown";
-      const linkEl = act.querySelector("a[href]");
-      const url = linkEl?.href || "";
-
-      if (name && name.length > 2) {
-        items.push({ name, type, url });
-      }
-    });
-
-    if (items.length > 0) {
-      sections.push({ title, items });
-    }
-  });
-
-  // Extract assignments specifically (with deadline if visible)
-  const assignments = [];
-  doc.querySelectorAll("li.modtype_assign, .activity.assign").forEach((el) => {
-    const name = cleanText(el.querySelector(".instancename, .activityname, a"));
-    const url = el.querySelector("a")?.href || "";
-    const dueText = cleanText(
-      el.querySelector(".due-date, .activity-due-date, .submissionstatustable"),
-    );
-
-    if (name) {
-      assignments.push({ name, url, dueText });
-    }
-  });
-
-  // Extract resource files
-  const files = [];
-  doc
-    .querySelectorAll("li.modtype_resource, li.modtype_url, li.modtype_folder")
-    .forEach((el) => {
-      const name = cleanText(
-        el.querySelector(".instancename, .activityname, a"),
-      );
-      const url = el.querySelector("a")?.href || "";
-      const type = el.className.match(/modtype_(\w+)/)?.[1] || "resource";
-      if (name) files.push({ name, url, type });
-    });
-
-  return { courseId, courseName, sections, assignments, files };
-}
-
-// ── 3. Video lectures page ────────────────────────────────────────
-export async function scrapeVideos(courseId) {
   try {
-    const doc = await fetchMoodlePage(
-      `/blocks/video/videoslist.php?courseid=${courseId}`,
-    );
-
-    const videos = [];
-
-    // Try multiple selectors for video list items
-    const rows = doc.querySelectorAll(
-      ".video-item, .list-group-item, table tr, .videoslist tr, li",
-    );
-
-    rows.forEach((row) => {
-      const link = row.querySelector("a[href]");
-      const title =
-        cleanText(link) || cleanText(row.querySelector("td, .title"));
-      const url = link?.href || "";
-      const date = cleanText(
-        row.querySelector(".date, td:last-child, .video-date"),
-      );
-
-      if (title && title.length > 3 && url) {
-        videos.push({ title: title.slice(0, 100), url, date });
+    const result = await moodleAjax(
+      sesskey,
+      'core_calendar_get_action_events_by_timesort',
+      {
+        timesortfrom: now,
+        timesortto:   future,
+        limitnum:     100,
+        limittononsuspendedevents: true,
       }
-    });
-
-    return videos;
-  } catch (e) {
-    console.warn(
-      `[Moodle] Could not scrape videos for course ${courseId}:`,
-      e.message,
     );
+    return result?.events || [];
+  } catch (e) {
+    console.warn('[Moodle] Calendar AJAX failed:', e.message);
     return [];
   }
 }
 
-// ── 4. Full sync — dashboard + all courses ────────────────────────
+// ── 4. Scrape a single course page (still server-rendered) ────────
+// This gets sections, files, and activities from the course content page.
+export async function scrapeCourse(courseId) {
+  const { doc } = await fetchMoodlePage(`/course/view.php?id=${courseId}`);
+
+  const courseName =
+    cleanText(doc.querySelector('h1.page-header-headings, h1, .page-title')) ||
+    `Course ${courseId}`;
+
+  // Sections (weekly/topic format)
+  const sections = [];
+  doc
+    .querySelectorAll('li[id^="section-"], .section.main, .topics .section, .weeks .section')
+    .forEach((sec) => {
+      const title =
+        cleanText(sec.querySelector('.sectionname, .section-title h3, h3.sectionname')) ||
+        'Section';
+
+      const items = [];
+      sec.querySelectorAll('li.activity, .activityinstance').forEach((act) => {
+        const nameEl = act.querySelector('.instancename, .activityname, a');
+        const name   = cleanText(nameEl)?.replace(/\s*(פתח|Open)\s*$/, '').trim();
+        const type   = act.className?.match(/modtype_(\w+)/)?.[1] || 'unknown';
+        const url    = act.querySelector('a[href]')?.href || '';
+        if (name && name.length > 2) items.push({ name, type, url });
+      });
+
+      if (items.length > 0) sections.push({ title, items });
+    });
+
+  // Resource files
+  const files = [];
+  doc
+    .querySelectorAll('li.modtype_resource, li.modtype_url, li.modtype_folder')
+    .forEach((el) => {
+      const name = cleanText(el.querySelector('.instancename, .activityname, a'));
+      const url  = el.querySelector('a')?.href || '';
+      const type = el.className.match(/modtype_(\w+)/)?.[1] || 'resource';
+      if (name) files.push({ name, url, type });
+    });
+
+  return { courseId, courseName, sections, files };
+}
+
+// ── 5. Scrape video lectures (best-effort) ────────────────────────
+async function scrapeVideos(courseId) {
+  try {
+    const { doc } = await fetchMoodlePage(
+      `/blocks/video/videoslist.php?courseid=${courseId}`
+    );
+    const videos = [];
+    doc
+      .querySelectorAll('.video-item, .list-group-item, table tr, .videoslist tr, li')
+      .forEach((row) => {
+        const link  = row.querySelector('a[href]');
+        const title = cleanText(link) || cleanText(row.querySelector('td, .title'));
+        const url   = link?.href || '';
+        const date  = cleanText(row.querySelector('.date, td:last-child, .video-date'));
+        if (title && title.length > 3 && url) {
+          videos.push({ title: title.slice(0, 100), url, date });
+        }
+      });
+    return videos;
+  } catch (e) {
+    return [];
+  }
+}
+
+// ── 6. Export: scrapeDashboard (kept for API compatibility) ───────
+// Now uses AJAX instead of DOM parsing for the course list.
+export async function scrapeDashboard() {
+  const sesskey = await getSesskey();
+  const raw = await fetchEnrolledCourses(sesskey);
+
+  return raw.map((c) => ({
+    id:       String(c.id),
+    name:     c.fullname || c.shortname || `Course ${c.id}`,
+    progress: c.progress || 0,
+    url:      `${MOODLE_BASE}/course/view.php?id=${c.id}`,
+  }));
+}
+
+// ── 7. Main full sync ─────────────────────────────────────────────
 export async function fullMoodleSync(onProgress) {
-  // Step 1: Get course list
-  onProgress?.("Loading course list…", 0);
-  const courses = await scrapeDashboard();
+  // Step 1: Get sesskey
+  onProgress?.('Connecting to BGU Moodle…', 0);
+  const sesskey = await getSesskey();
 
-  if (!courses.length)
-    throw new Error("No courses found. Are you logged in to Moodle?");
-  onProgress?.(`Found ${courses.length} courses`, 10);
+  // Step 2: Get enrolled courses via AJAX
+  onProgress?.('Loading your courses…', 10);
+  const rawCourses = await fetchEnrolledCourses(sesskey);
+  if (!rawCourses.length) {
+    throw new Error(
+      'No active courses found. Make sure you are logged in to BGU Moodle and have enrolled courses this semester.'
+    );
+  }
 
+  const courses = rawCourses.map((c) => ({
+    id:       String(c.id),
+    name:     c.fullname || c.shortname || `Course ${c.id}`,
+    progress: c.progress || 0,
+    url:      `${MOODLE_BASE}/course/view.php?id=${c.id}`,
+  }));
+
+  onProgress?.(`Found ${courses.length} courses ✅`, 20);
+
+  // Step 3: Get real deadlines via AJAX calendar
+  onProgress?.('Loading deadlines from calendar…', 25);
+  const calendarEvents = await fetchUpcomingDeadlines(sesskey);
+
+  // Convert to our assignment format with real ISO dates
+  const allAssignments = calendarEvents
+    .filter((e) => e.timesort && e.name)
+    .map((e) => ({
+      name:       e.name,
+      dueDate:    new Date(e.timesort * 1000).toISOString(), // real timestamp!
+      url:        e.action?.url || e.url || '',
+      courseId:   String(e.course?.id || ''),
+      courseName: e.course?.fullname || e.course?.shortname || '',
+      type:       e.modulename || 'assign',
+    }))
+    // Only include assignments from enrolled courses
+    .filter((a) => !a.courseId || courses.some((c) => c.id === a.courseId))
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+  onProgress?.(`Found ${allAssignments.length} upcoming deadlines ✅`, 35);
+
+  // Step 4: Scrape course pages for content (sections, files)
   const courseDetails = [];
-  const allAssignments = [];
-  const allFiles = [];
+  const allFiles      = [];
 
-  // Step 2: Scrape each course
   for (let i = 0; i < courses.length; i++) {
     const course = courses[i];
-    const pct = 10 + Math.round((i / courses.length) * 70);
-    onProgress?.(`Reading ${course.name}…`, pct);
+    const pct    = 35 + Math.round((i / courses.length) * 45);
+    onProgress?.(`Reading course: ${course.name.slice(0, 40)}…`, pct);
 
     try {
       const details = await scrapeCourse(course.id);
-      courseDetails.push(details);
+      courseDetails.push({ ...details, courseName: course.name });
 
-      // Collect assignments
-      details.assignments.forEach((a) => {
-        allAssignments.push({
-          ...a,
-          courseName: course.name,
-          courseId: course.id,
-        });
-      });
-
-      // Collect files
       details.files.forEach((f) => {
         allFiles.push({ ...f, courseName: course.name, courseId: course.id });
       });
 
-      // Small delay to be polite to the server
-      await new Promise((r) => setTimeout(r, 300));
+      // Polite delay — BGU server doesn't need hammering
+      await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       console.warn(`[Moodle] Skipped course ${course.name}:`, e.message);
     }
   }
 
-  // Step 3: Scrape videos for each course
-  onProgress?.("Loading lecture videos…", 80);
+  // Step 5: Videos (best-effort, don't block if it fails)
+  onProgress?.('Looking for lecture videos…', 82);
   const allVideos = {};
-  for (const course of courses.slice(0, 8)) {
-    const videos = await scrapeVideos(course.id);
-    if (videos.length) allVideos[course.id] = videos;
+  for (const course of courses.slice(0, 6)) {
+    try {
+      const videos = await scrapeVideos(course.id);
+      if (videos.length) allVideos[course.id] = videos;
+    } catch (_) {}
     await new Promise((r) => setTimeout(r, 200));
   }
 
-  onProgress?.("Saving data…", 95);
+  onProgress?.('Saving to storage…', 95);
 
   const moodleData = {
     courses,
     courseDetails,
     assignments: allAssignments,
-    files: allFiles,
-    videos: allVideos,
-    lastSync: Date.now(),
+    files:       allFiles,
+    videos:      allVideos,
+    lastSync:    Date.now(),
   };
 
-  // Save to chrome.storage for AI agent to read
   await new Promise((r) =>
-    chrome.storage.local.set({ moodleData, moodleConnected: true }, r),
+    chrome.storage.local.set({ moodleData, moodleConnected: true }, r)
   );
 
-  onProgress?.("Done!", 100);
+  onProgress?.(`Done! ${courses.length} courses · ${allAssignments.length} deadlines`, 100);
   return moodleData;
 }
