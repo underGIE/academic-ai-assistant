@@ -90,6 +90,11 @@
     .moodle-item-name:hover { text-decoration: underline; }
     .re-sync-btn     { font-size: 10px; padding: 3px 8px; border: 1px solid #ddd; border-radius: 8px;
                        background: #f8f9fa; cursor: pointer; }
+    .deadline-row    { display: flex; align-items: center; justify-content: space-between;
+                       padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+    .deadline-row:last-child { border-bottom: none; }
+    .deadline-group-label { font-size: 9px; font-weight: 700; text-transform: uppercase;
+                            letter-spacing: 0.6px; padding: 4px 0 2px; }
 
     /* Progress bar */
     .progress-bar-bg   { background: #e9ecef; border-radius: 6px; height: 6px; width: 100%; }
@@ -206,6 +211,21 @@
         Connect your <strong>@post.bgu.ac.il</strong> account so the extension reads both inboxes.
         A Google sign-in popup will open — choose your BGU account.
       </p>
+
+      <!-- Redirect URI helper -->
+      <div style="background:#f0f4ff;border:1px solid #c3d0f5;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:3px">⚙️ Getting redirect_uri_mismatch?</div>
+        <div style="font-size:10px;color:#555;margin-bottom:5px">
+          Add this URI to your
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#1a3a5c;font-weight:600">Google Cloud Console</a>
+          OAuth client → Authorised redirect URIs:
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <code id="redirect-uri-display" style="font-size:9px;background:#fff;border:1px solid #dde;border-radius:4px;padding:4px 6px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333;user-select:all">Loading…</code>
+          <button id="btn-copy-redirect" style="font-size:10px;padding:4px 8px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;flex-shrink:0">📋 Copy</button>
+        </div>
+      </div>
+
       <div class="setup-row">
         <span class="setup-label">Status</span>
         <span id="bgu-email-status" style="font-size:11px;font-weight:600;color:#e74c3c">❌ Not connected</span>

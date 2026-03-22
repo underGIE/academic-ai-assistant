@@ -154,11 +154,35 @@ function shortFrom(from){
 // ── MOODLE TAB ────────────────────────────────────────────────────
 let moodleScraping = false;
 
+const MOODLE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
 async function loadMoodleTab() {
   const panel = document.getElementById('panel-moodle');
   const { moodleData, moodleConnected } = await get(['moodleData','moodleConnected']);
-  if (!moodleConnected||!moodleData) { renderMoodleConnect(panel); return; }
+
+  // Never scraped — show connect screen
+  if (!moodleConnected || !moodleData) { renderMoodleConnect(panel); return; }
+
+  // Data is fresh (< 6h) — render from cache, no scrape
+  const age = Date.now() - (moodleData.lastSync || 0);
+  if (age < MOODLE_CACHE_TTL) {
+    renderMoodleData(moodleData, panel);
+    return;
+  }
+
+  // Data is stale — show cached data immediately, then quietly re-sync in background
   renderMoodleData(moodleData, panel);
+  const ageH = Math.round(age / 3600000);
+  showToast(`ℹ️ Moodle data is ${ageH}h old — re-syncing in background…`);
+  try {
+    const { fullMoodleSync } = await import('./src/moodleScraper.js');
+    const fresh = await fullMoodleSync();
+    renderMoodleData(fresh, panel);
+    showToast(`✅ Moodle refreshed — ${fresh.courses.length} courses`);
+    loadTodayTab();
+  } catch(e) {
+    console.warn('[Moodle] Background re-sync failed:', e.message);
+  }
 }
 
 function renderMoodleConnect(panel) {
@@ -215,121 +239,202 @@ async function startMoodleSync() {
 
 function renderMoodleData(data, panel) {
   const { courses=[], assignments=[], lastSync } = data;
-  const ago = lastSync ? Math.round((Date.now()-lastSync)/60000) : null;
+  const now    = new Date();
+  const ageMin = lastSync ? Math.round((Date.now()-lastSync)/60000) : null;
+  const ageStr = ageMin == null ? '' : ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin/60)}h ago`;
 
-  let html = `
-    <div class="moodle-header">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px 0">
-        <span style="font-size:10px;color:#aaa">${courses.length} courses · ${ago!=null?`${ago}m ago`:''}</span>
-        <div style="display:flex;gap:6px">
-          <button class="re-sync-btn" id="btn-gen-summaries">🧠 AI Summaries</button>
-          <button class="re-sync-btn" id="btn-re-sync">🔄 Re-sync</button>
-        </div>
+  // ── 1. Deadlines section (all courses) ────────────────────────
+  const allDeadlines = assignments
+    .filter(a => a.dueDate)
+    .sort((a,b) => new Date(a.dueDate)-new Date(b.dueDate))
+    .slice(0, 20);
+
+  const overdueList  = allDeadlines.filter(a => new Date(a.dueDate) < now);
+  const upcomingList = allDeadlines.filter(a => new Date(a.dueDate) >= now);
+
+  function deadlineRow(a) {
+    const d     = Math.ceil((new Date(a.dueDate)-now)/86400000);
+    const color = d < 0 ? '#e74c3c' : d <= 2 ? '#e74c3c' : d <= 5 ? '#e67e22' : '#27ae60';
+    const label = d < 0 ? `⚠️ ${Math.abs(d)}d overdue` : d === 0 ? '🔴 Today!' : d === 1 ? '🔴 Tomorrow' : `${d}d left`;
+    const date  = new Date(a.dueDate).toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+    return `<div class="deadline-row">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:600;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
+        <div style="font-size:9px;color:#888;margin-top:1px">${esc(a.courseName||'')}</div>
       </div>
-      <div class="course-tabs" id="course-tabs">`;
-  courses.forEach((c,i)=>{
-    html+=`<button class="course-tab${i===0?' active':''}" data-idx="${i}" data-id="${c.id}">${esc(c.name.slice(0,28))}</button>`;
+      <div style="text-align:right;flex-shrink:0;margin-left:8px">
+        <div style="font-size:10px;font-weight:700;color:${color}">${label}</div>
+        <div style="font-size:9px;color:#aaa">${date}</div>
+      </div>
+    </div>`;
+  }
+
+  let deadlineHtml = '';
+  if (overdueList.length) {
+    deadlineHtml += `<div class="deadline-group-label" style="color:#e74c3c">⚠️ OVERDUE (${overdueList.length})</div>`;
+    deadlineHtml += overdueList.map(deadlineRow).join('');
+  }
+  if (upcomingList.length) {
+    deadlineHtml += `<div class="deadline-group-label" style="color:#1a3a5c;margin-top:${overdueList.length?'8px':'0'}">📅 Upcoming</div>`;
+    deadlineHtml += upcomingList.slice(0,10).map(deadlineRow).join('');
+  }
+  if (!deadlineHtml) {
+    deadlineHtml = `<div style="font-size:11px;color:#aaa;padding:8px 0">No deadlines found. Re-sync if this looks wrong.</div>`;
+  }
+
+  // ── 2. Course dropdown options ─────────────────────────────────
+  const courseOptions = courses.map((c,i) =>
+    `<option value="${i}" data-id="${c.id}">${esc(c.name.length>50?c.name.slice(0,50)+'…':c.name)}</option>`
+  ).join('');
+
+  // ── 3. Build full HTML ─────────────────────────────────────────
+  let html = `
+    <div style="padding:8px 10px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:10px;color:#aaa">${courses.length} courses · ${ageStr}</span>
+      <div style="display:flex;gap:5px">
+        <button class="re-sync-btn" id="btn-gen-summaries" title="Generate AI study guides">🧠</button>
+        <button class="re-sync-btn" id="btn-re-sync" title="Force re-sync">🔄</button>
+      </div>
+    </div>
+
+    <!-- Deadlines panel -->
+    <div class="moodle-section" style="margin:8px 10px 0">
+      <div class="moodle-section-title" style="cursor:pointer;user-select:none" id="toggle-deadlines">
+        📅 Deadlines &amp; Assignments
+        <span id="deadlines-toggle-icon" style="float:right;font-size:10px;color:#aaa">▲</span>
+      </div>
+      <div id="deadlines-body" style="padding-top:4px">${deadlineHtml}</div>
+    </div>
+
+    <!-- Course picker -->
+    <div style="padding:8px 10px 4px">
+      <div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:5px">📚 Course Detail</div>
+      <div style="position:relative">
+        <select id="course-select" style="width:100%;padding:6px 8px;border:1px solid #dde;border-radius:6px;font-size:11px;background:#fff;color:#1a3a5c;appearance:none;cursor:pointer">
+          ${courseOptions}
+        </select>
+        <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#888;font-size:10px">▼</span>
+      </div>
+    </div>
+    <div id="course-detail-panel" style="padding:0 10px 10px"></div>`;
+
+  panel.innerHTML = html;
+
+  // ── Wire collapse toggle for deadlines ─────────────────────────
+  document.getElementById('toggle-deadlines')?.addEventListener('click', () => {
+    const body = document.getElementById('deadlines-body');
+    const icon = document.getElementById('deadlines-toggle-icon');
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? '' : 'none';
+    icon.textContent = hidden ? '▲' : '▼';
   });
-  html+=`</div></div><div id="course-panels">`;
 
-  courses.forEach((course,i)=>{
-    const detail  = data.courseDetails?.find(d=>String(d.courseId)===String(course.id));
-    const assigns = assignments.filter(a=>String(a.courseId)===String(course.id));
-    const vids    = (data.videos||{})[course.id]||[];
-    html+=`<div class="course-panel${i===0?'':' hidden'}" data-panel="${i}">`;
+  // ── Render selected course detail ──────────────────────────────
+  function renderCourseDetail(idx) {
+    const course  = courses[idx];
+    if (!course) return;
+    const detail  = data.courseDetails?.find(d => String(d.courseId) === String(course.id));
+    const assigns = assignments.filter(a => String(a.courseId) === String(course.id));
+    const vids    = (data.videos || {})[course.id] || [];
+    const pnl     = document.getElementById('course-detail-panel');
+    let inner = '';
 
-    // AI Study Guide placeholder (loaded on-demand)
-    html+=`<div class="moodle-section">
+    // AI Study Guide
+    inner += `<div class="moodle-section">
       <div class="moodle-section-title">🧠 AI Study Guide</div>
       <div class="ai-summary-box" id="summary-${course.id}">
         <button class="setup-btn" style="font-size:10px;padding:5px 10px" data-course-id="${course.id}" id="btn-summary-${course.id}">
-          Generate Study Guide for this course
+          Generate Study Guide
         </button>
       </div>
     </div>`;
 
-    // Assignments
+    // Course assignments (mini view)
     if (assigns.length) {
-      const now=new Date();
-      html+=`<div class="moodle-section"><div class="moodle-section-title">📝 Assignments</div>`;
-      assigns.forEach(a=>{
-        const d=a.dueDate?Math.ceil((new Date(a.dueDate)-now)/86400000):null;
-        const c=d===null?'#aaa':d<0?'#e74c3c':d<=2?'#e74c3c':d<=5?'#e67e22':'#27ae60';
-        const label=d===null?'No deadline':d<0?'OVERDUE':`${d}d left`;
-        html+=`<div class="moodle-item">
+      inner += `<div class="moodle-section"><div class="moodle-section-title">📝 This Course's Tasks</div>`;
+      assigns.forEach(a => {
+        const d = a.dueDate ? Math.ceil((new Date(a.dueDate)-now)/86400000) : null;
+        const c = d===null?'#aaa':d<0?'#e74c3c':d<=2?'#e74c3c':d<=5?'#e67e22':'#27ae60';
+        const label = d===null?'No deadline':d<0?'OVERDUE':`${d}d`;
+        inner += `<div class="moodle-item">
           <span class="moodle-item-icon">📋</span>
           <span class="moodle-item-name" style="color:#333">${esc(a.name)}</span>
-          <span style="font-size:9px;color:${c};margin-left:auto;flex-shrink:0">${label}</span>
+          <span style="font-size:9px;color:${c};margin-left:auto;flex-shrink:0;font-weight:600">${label}</span>
         </div>`;
       });
-      html+=`</div>`;
+      inner += `</div>`;
     }
 
-    // Lecture videos
+    // Videos
     if (vids.length) {
-      html+=`<div class="moodle-section"><div class="moodle-section-title">🎥 Lecture Videos (${vids.length})</div>`;
-      vids.slice(0,8).forEach(v=>{
-        html+=`<div class="moodle-item">
+      inner += `<div class="moodle-section"><div class="moodle-section-title">🎥 Lecture Videos (${vids.length})</div>`;
+      vids.slice(0,8).forEach(v => {
+        inner += `<div class="moodle-item">
           <span class="moodle-item-icon">▶️</span>
           <a href="${esc(v.url||'#')}" target="_blank" class="moodle-item-name">${esc(v.title)}</a>
           ${v.date?`<span style="font-size:9px;color:#aaa;margin-left:auto">${esc(v.date)}</span>`:''}
         </div>`;
       });
-      html+=`</div>`;
+      inner += `</div>`;
     }
 
-    // Files from sections
+    // Section files
     if (detail?.sections?.length) {
-      detail.sections.forEach(sec=>{
-        const resources=(sec.items||[]).filter(it=>['resource','url','folder','page'].includes(it.type));
+      detail.sections.forEach(sec => {
+        const resources = (sec.items||[]).filter(it => ['resource','url','folder','page'].includes(it.type));
         if (!resources.length) return;
-        html+=`<div class="moodle-section"><div class="moodle-section-title">📁 ${esc(sec.title)}</div>`;
-        resources.forEach(item=>{
-          const icon=item.type==='url'?'🔗':item.type==='folder'?'📂':'📄';
-          html+=`<div class="moodle-item">
+        inner += `<div class="moodle-section"><div class="moodle-section-title">📁 ${esc(sec.title)}</div>`;
+        resources.forEach(item => {
+          const icon = item.type==='url'?'🔗':item.type==='folder'?'📂':'📄';
+          inner += `<div class="moodle-item">
             <span class="moodle-item-icon">${icon}</span>
             <a href="${esc(item.url||'#')}" target="_blank" class="moodle-item-name">${esc(item.name)}</a>
           </div>`;
         });
-        html+=`</div>`;
+        inner += `</div>`;
       });
     }
 
-    if (!assigns.length&&!vids.length&&!detail?.sections?.length) {
-      html+=`<div class="empty-state" style="padding:24px"><span>📂</span><p>No content found.<br>Try re-syncing.</p></div>`;
+    if (!assigns.length && !vids.length && !detail?.sections?.length) {
+      inner += `<div class="empty-state" style="padding:18px"><span>📂</span><p>No content yet.<br>Re-sync may help.</p></div>`;
     }
 
-    html+=`</div>`;
-  });
-  html+=`</div>`;
-  panel.innerHTML = html;
+    pnl.innerHTML = inner;
+    loadCachedSummary(course.id);
+    pnl.querySelector(`#btn-summary-${course.id}`)?.addEventListener('click', () => generateSummary(course.id));
+  }
 
-  // Course tab switching
-  panel.querySelectorAll('.course-tab').forEach(tab=>{
-    tab.addEventListener('click',()=>{
-      panel.querySelectorAll('.course-tab').forEach(t=>t.classList.remove('active'));
-      panel.querySelectorAll('.course-panel').forEach(p=>p.classList.add('hidden'));
-      tab.classList.add('active');
-      panel.querySelector(`.course-panel[data-panel="${tab.dataset.idx}"]`)?.classList.remove('hidden');
-      // Load cached summary if exists
-      loadCachedSummary(tab.dataset.id);
-    });
-  });
+  // Course dropdown change
+  const sel = document.getElementById('course-select');
+  sel?.addEventListener('change', () => renderCourseDetail(+sel.value));
+  renderCourseDetail(0); // render first course
 
-  // Load summary for first course
-  if (courses.length) loadCachedSummary(courses[0].id);
-
-  // Generate study guide buttons
-  panel.querySelectorAll('[id^="btn-summary-"]').forEach(btn=>{
-    btn.addEventListener('click', ()=>generateSummary(btn.dataset.courseId));
-  });
-
-  // Generate all summaries
+  // AI Summaries button
   document.getElementById('btn-gen-summaries')?.addEventListener('click', generateAllSummaries);
 
-  // Re-sync
-  document.getElementById('btn-re-sync')?.addEventListener('click', async ()=>{
-    await set({moodleConnected:false}); loadMoodleTab();
+  // Re-sync button — force fresh scrape regardless of cache
+  document.getElementById('btn-re-sync')?.addEventListener('click', async () => {
+    panel.innerHTML = `<div class="moodle-connect-screen">
+      <div style="font-size:34px">🔄</div>
+      <p style="font-size:11px;color:#666;margin:10px 0">Re-syncing Moodle…</p>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+      <p id="progress-text" style="font-size:10px;color:#888;margin-top:5px;text-align:center"></p>
+    </div>`;
+    try {
+      const { fullMoodleSync } = await import('./src/moodleScraper.js');
+      const fresh = await fullMoodleSync((msg,pct) => {
+        const el = document.getElementById('progress-text');
+        const fill = document.getElementById('progress-fill');
+        if(el) el.textContent = msg;
+        if(fill) fill.style.width = `${pct}%`;
+      });
+      renderMoodleData(fresh, panel);
+      showToast(`✅ Moodle refreshed — ${fresh.courses.length} courses`);
+      loadTodayTab();
+    } catch(e) {
+      showToast('❌ Re-sync failed: ' + e.message);
+      renderMoodleData(data, panel); // restore old data
+    }
   });
 }
 
@@ -614,6 +719,26 @@ async function loadCourses(moodleData){
 }
 
 function attachSetupListeners(){
+  // Populate redirect URI box so user can copy it to Google Cloud Console
+  const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  const uriDisplay  = document.getElementById('redirect-uri-display');
+  const copyBtn     = document.getElementById('btn-copy-redirect');
+  if (uriDisplay) uriDisplay.textContent = redirectUri;
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(redirectUri).then(() => {
+        copyBtn.textContent = '✅ Copied!';
+        setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
+      }).catch(() => {
+        // fallback: select the text
+        uriDisplay?.select?.();
+        document.execCommand('copy');
+        copyBtn.textContent = '✅ Copied!';
+        setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
+      });
+    });
+  }
+
   document.getElementById('btn-google-connect')?.addEventListener('click',async()=>{
     const el=document.getElementById('google-status'); el.textContent='🔄…';
     try{ await chrome.runtime.sendMessage({type:'syncAll'}); await set({googleConnected:true}); el.textContent='✅ Connected'; loadInboxTab(); }
