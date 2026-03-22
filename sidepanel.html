@@ -14,57 +14,59 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: #f5f7fa;
         color: #333;
-        width: 380px;
+        width: 400px;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
       }
 
-      /* ── Header ── */
+      /* Header */
       .header {
         background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
         color: #fff;
-        padding: 12px 16px;
+        padding: 10px 14px;
         display: flex;
         align-items: center;
         justify-content: space-between;
       }
       .header h1 {
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 600;
       }
       .version {
         font-size: 10px;
-        opacity: 0.7;
+        opacity: 0.65;
         background: rgba(255, 255, 255, 0.15);
-        padding: 2px 7px;
-        border-radius: 8px;
+        padding: 2px 6px;
+        border-radius: 6px;
       }
 
-      /* ── Tabs ── */
+      /* Tab bar — 5 tabs */
       .tab-bar {
         display: flex;
         background: #fff;
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 2px solid #e9ecef;
       }
       .tab-btn {
         flex: 1;
-        padding: 10px 4px;
-        font-size: 11px;
+        padding: 9px 2px;
+        font-size: 10px;
         border: none;
         background: none;
         cursor: pointer;
-        color: #777;
+        color: #888;
         border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
         transition: all 0.15s;
+        line-height: 1.3;
       }
       .tab-btn.active {
         color: #1a3a5c;
         border-bottom-color: #1a3a5c;
-        font-weight: 600;
+        font-weight: 700;
       }
 
-      /* ── Panels ── */
+      /* Panels */
       .panel {
         flex: 1;
         overflow-y: auto;
@@ -73,42 +75,41 @@
         display: none !important;
       }
 
-      /* ── Empty state ── */
+      /* Empty */
       .empty-state {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
         padding: 40px 20px;
-        color: #aaa;
-        font-size: 13px;
+        color: #bbb;
+        font-size: 12px;
         text-align: center;
-        gap: 10px;
+        gap: 8px;
       }
       .empty-state span {
-        font-size: 38px;
+        font-size: 36px;
       }
 
-      /* ── Today ── */
+      /* Today */
       .next-event-card {
         background: linear-gradient(135deg, #1a3a5c, #2d6a9f);
         color: #fff;
-        margin: 12px;
+        margin: 10px;
         border-radius: 14px;
-        padding: 16px;
-        box-shadow: 0 4px 12px rgba(26, 58, 92, 0.25);
+        padding: 14px;
+        box-shadow: 0 4px 12px rgba(26, 58, 92, 0.2);
       }
       .next-label {
         font-size: 10px;
         text-transform: uppercase;
-        letter-spacing: 1.2px;
-        opacity: 0.75;
-        margin-bottom: 6px;
+        letter-spacing: 1px;
+        opacity: 0.7;
+        margin-bottom: 5px;
       }
       .event-title {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 700;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
         line-height: 1.3;
       }
       .event-time {
@@ -117,57 +118,59 @@
       }
       .event-loc {
         font-size: 11px;
-        opacity: 0.7;
-        margin-top: 4px;
+        opacity: 0.65;
+        margin-top: 3px;
       }
       .section-label {
         font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #aaa;
-        padding: 10px 16px 4px;
+        color: #bbb;
+        padding: 8px 14px 3px;
       }
       .event-row {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
-        padding: 9px 16px;
+        padding: 8px 14px;
         border-bottom: 1px solid #f0f0f0;
-        font-size: 13px;
+        font-size: 12px;
+      }
+      .overdue-row {
+        background: #fff5f5;
       }
       .event-dot {
         color: #2d6a9f;
-        font-size: 20px;
-        line-height: 1;
+        font-size: 16px;
+        line-height: 1.4;
+        flex-shrink: 0;
       }
       .event-row-title {
         flex: 1;
       }
       .event-row-time {
-        font-size: 11px;
-        color: #999;
+        font-size: 10px;
+        color: #aaa;
         white-space: nowrap;
+        flex-shrink: 0;
       }
 
-      /* ── Inbox ── */
+      /* Inbox */
       .filter-bar {
         display: flex;
-        gap: 6px;
-        padding: 10px;
+        gap: 5px;
+        padding: 8px 10px;
         overflow-x: auto;
         scrollbar-width: none;
       }
       .filter-btn {
-        font-size: 11px;
-        padding: 4px 10px;
+        font-size: 10px;
+        padding: 3px 9px;
         border: 1px solid #ddd;
         border-radius: 12px;
         background: #f8f9fa;
         cursor: pointer;
         white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 4px;
       }
       .filter-btn.active {
         background: #1a3a5c;
@@ -175,24 +178,23 @@
         border-color: #1a3a5c;
       }
       .count-badge {
-        font-size: 10px;
+        font-size: 9px;
         background: rgba(0, 0, 0, 0.1);
-        padding: 1px 5px;
-        border-radius: 6px;
+        padding: 1px 4px;
+        border-radius: 5px;
       }
       .filter-btn.active .count-badge {
         background: rgba(255, 255, 255, 0.25);
       }
       .email-list {
-        padding: 8px;
+        padding: 6px;
       }
       .email-card {
         background: #fff;
         border: 1px solid #e9ecef;
-        border-radius: 10px;
-        padding: 11px;
-        margin-bottom: 8px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        border-radius: 9px;
+        padding: 10px;
+        margin-bottom: 7px;
       }
       .email-card.unread {
         border-left: 3px solid #1a3a5c;
@@ -200,52 +202,48 @@
       .email-header {
         display: flex;
         align-items: center;
-        gap: 6px;
-        margin-bottom: 4px;
+        gap: 5px;
+        margin-bottom: 3px;
       }
       .email-from {
         font-weight: 600;
-        font-size: 12px;
+        font-size: 11px;
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
       .email-date {
-        font-size: 11px;
-        color: #999;
+        font-size: 10px;
+        color: #aaa;
         flex-shrink: 0;
       }
       .email-subject {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 500;
         margin-bottom: 3px;
       }
       .email-snippet {
-        font-size: 11px;
-        color: #777;
-        margin-bottom: 5px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+        font-size: 10px;
+        color: #888;
+        margin-bottom: 4px;
       }
       .email-badges {
         display: flex;
-        gap: 4px;
+        gap: 3px;
         flex-wrap: wrap;
       }
       .unread-dot {
-        width: 7px;
-        height: 7px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: #1a3a5c;
         flex-shrink: 0;
       }
       .badge {
-        font-size: 10px;
-        padding: 2px 7px;
-        border-radius: 8px;
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 7px;
       }
       .badge-urgent {
         background: #fde8e8;
@@ -256,11 +254,109 @@
         color: #856404;
       }
 
-      /* ── Chat ── */
+      /* Moodle tab */
+      .moodle-connect-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 24px;
+        text-align: center;
+      }
+      .moodle-header {
+        background: #fff;
+        border-bottom: 1px solid #e9ecef;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .course-tabs {
+        display: flex;
+        gap: 5px;
+        padding: 6px 10px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .course-tab {
+        font-size: 10px;
+        padding: 4px 10px;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        background: #f8f9fa;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .course-tab.active {
+        background: #1a3a5c;
+        color: #fff;
+        border-color: #1a3a5c;
+      }
+      .course-panel {
+        padding: 4px 0 12px;
+      }
+      .moodle-section {
+        padding: 6px 12px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .moodle-section-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #888;
+        padding: 6px 0 4px;
+      }
+      .moodle-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 2px;
+      }
+      .moodle-item-icon {
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+      .moodle-item-name {
+        font-size: 12px;
+        color: #1a3a5c;
+        text-decoration: none;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .moodle-item-name:hover {
+        text-decoration: underline;
+      }
+      .re-sync-btn {
+        font-size: 10px;
+        padding: 3px 8px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #f8f9fa;
+        cursor: pointer;
+      }
+
+      /* Progress bar */
+      .progress-bar-bg {
+        background: #e9ecef;
+        border-radius: 6px;
+        height: 6px;
+        width: 100%;
+      }
+      .progress-bar-fill {
+        background: linear-gradient(90deg, #1a3a5c, #2d6a9f);
+        height: 6px;
+        border-radius: 6px;
+        width: 0%;
+        transition: width 0.3s;
+      }
+
+      /* Chat */
       #panel-chat {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - 90px);
+        height: calc(100vh - 88px);
       }
       #panel-chat.hidden {
         display: none !important;
@@ -268,16 +364,16 @@
       #chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 12px;
+        padding: 10px;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 7px;
       }
       .msg {
-        padding: 10px 13px;
-        border-radius: 14px;
-        font-size: 13px;
-        max-width: 88%;
+        padding: 9px 12px;
+        border-radius: 13px;
+        font-size: 12px;
+        max-width: 90%;
         line-height: 1.5;
         white-space: pre-wrap;
         word-break: break-word;
@@ -286,124 +382,111 @@
         background: #1a3a5c;
         color: #fff;
         align-self: flex-end;
-        border-bottom-right-radius: 4px;
+        border-bottom-right-radius: 3px;
       }
       .msg-assistant {
         background: #f0f4f8;
         color: #333;
         align-self: flex-start;
-        border-bottom-left-radius: 4px;
+        border-bottom-left-radius: 3px;
       }
       .msg-loading {
-        opacity: 0.55;
+        opacity: 0.5;
       }
       .msg-ref {
         display: inline-block;
         background: #dceefb;
         color: #1a3a5c;
-        padding: 2px 7px;
-        border-radius: 8px;
-        font-size: 10px;
-        margin: 2px 2px 0;
+        padding: 2px 6px;
+        border-radius: 7px;
+        font-size: 9px;
+        margin: 1px;
       }
       .quick-prompts {
         display: flex;
-        gap: 6px;
-        padding: 6px 10px;
+        gap: 5px;
+        padding: 5px 8px;
         overflow-x: auto;
         border-top: 1px solid #f0f0f0;
         scrollbar-width: none;
       }
       .quick-btn {
-        font-size: 11px;
-        padding: 5px 11px;
+        font-size: 10px;
+        padding: 4px 10px;
         border: 1px solid #c8d8e8;
-        border-radius: 14px;
+        border-radius: 13px;
         background: #f0f4f8;
         cursor: pointer;
         white-space: nowrap;
-        transition: all 0.15s;
       }
       .quick-btn:hover {
         background: #1a3a5c;
         color: #fff;
-        border-color: #1a3a5c;
       }
       .chat-input-row {
         display: flex;
-        gap: 8px;
-        padding: 10px;
+        gap: 7px;
+        padding: 8px 10px;
         border-top: 1px solid #e9ecef;
         background: #fff;
       }
       #chat-input {
         flex: 1;
-        padding: 9px 13px;
+        padding: 8px 12px;
         border: 1px solid #ddd;
-        border-radius: 20px;
-        font-size: 13px;
+        border-radius: 18px;
+        font-size: 12px;
         outline: none;
-        transition: border-color 0.15s;
       }
       #chat-input:focus {
         border-color: #2d6a9f;
       }
       #chat-send {
-        padding: 9px 16px;
+        padding: 8px 14px;
         background: #1a3a5c;
         color: #fff;
         border: none;
-        border-radius: 20px;
+        border-radius: 18px;
         cursor: pointer;
-        font-size: 13px;
-        transition: background 0.15s;
-      }
-      #chat-send:hover {
-        background: #2d6a9f;
+        font-size: 12px;
       }
 
-      /* ── Setup ── */
+      /* Setup */
       .setup-panel {
         padding-bottom: 20px;
       }
       .setup-section {
         background: #fff;
-        margin: 10px 12px;
-        border-radius: 12px;
-        padding: 14px;
+        margin: 8px 10px;
+        border-radius: 11px;
+        padding: 13px;
         border: 1px solid #e9ecef;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
       }
       .setup-section h3 {
-        font-size: 13px;
+        font-size: 12px;
         color: #1a3a5c;
-        margin-bottom: 10px;
+        margin-bottom: 9px;
         font-weight: 700;
       }
       .setup-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
       }
       .setup-label {
-        font-size: 12px;
+        font-size: 11px;
         color: #555;
       }
-      .status-badge {
-        font-size: 12px;
-        font-weight: 600;
-      }
       .setup-btn {
-        padding: 8px 14px;
+        padding: 7px 13px;
         background: #1a3a5c;
         color: #fff;
         border: none;
-        border-radius: 8px;
+        border-radius: 7px;
         cursor: pointer;
-        font-size: 12px;
-        margin-top: 4px;
-        transition: background 0.15s;
+        font-size: 11px;
+        margin-top: 3px;
       }
       .setup-btn:hover {
         background: #2d6a9f;
@@ -411,48 +494,28 @@
       .setup-btn.secondary {
         background: #6c757d;
       }
-      .setup-btn.btn-active {
+      .setup-btn.success {
         background: #27ae60;
-        cursor: default;
       }
       .setup-input {
         width: 100%;
-        padding: 8px 10px;
+        padding: 7px 9px;
         border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 12px;
-        margin-bottom: 8px;
+        border-radius: 7px;
+        font-size: 11px;
+        margin-bottom: 7px;
         outline: none;
-        transition: border-color 0.15s;
       }
       .setup-input:focus {
         border-color: #2d6a9f;
       }
-
-      /* Account switcher */
-      .account-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-        border: 1px solid #e9ecef;
-      }
-      .active-account {
-        background: #f0f8f0;
-        border-color: #27ae60;
-      }
-
-      /* Courses */
       .course-card {
         display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
+        align-items: center;
         background: #f8f9fa;
-        border-radius: 8px;
-        padding: 9px 10px;
-        margin-bottom: 6px;
+        border-radius: 7px;
+        padding: 8px 9px;
+        margin-bottom: 5px;
       }
       .course-info {
         flex: 1;
@@ -462,26 +525,23 @@
         border: none;
         color: #e74c3c;
         cursor: pointer;
-        font-size: 13px;
-        padding: 0 4px;
-        flex-shrink: 0;
+        font-size: 12px;
       }
 
-      /* ── Toast ── */
+      /* Toast */
       #toast {
         position: fixed;
-        bottom: 70px;
+        bottom: 65px;
         left: 50%;
-        transform: translateX(-50%) translateY(20px);
+        transform: translateX(-50%) translateY(16px);
         background: #1a3a5c;
         color: #fff;
-        padding: 8px 18px;
-        border-radius: 20px;
-        font-size: 12px;
+        padding: 7px 16px;
+        border-radius: 18px;
+        font-size: 11px;
         opacity: 0;
-        transition: all 0.25s;
+        transition: all 0.2s;
         pointer-events: none;
-        white-space: nowrap;
         z-index: 9999;
       }
       #toast.show {
@@ -493,25 +553,36 @@
   <body>
     <div class="header">
       <h1>🎓 Academic AI Assistant</h1>
-      <span class="version">v0.3.0</span>
+      <span class="version">v0.4.0</span>
     </div>
 
     <div class="tab-bar">
-      <button class="tab-btn" data-tab="today" id="tab-today">📅 Today</button>
-      <button class="tab-btn" data-tab="inbox" id="tab-inbox">📧 Inbox</button>
-      <button class="tab-btn" data-tab="chat" id="tab-chat">💬 Chat</button>
-      <button class="tab-btn" data-tab="setup" id="tab-setup">⚙️ Setup</button>
+      <button class="tab-btn" data-tab="today" id="tab-today">
+        📅<br />Today
+      </button>
+      <button class="tab-btn" data-tab="inbox" id="tab-inbox">
+        📧<br />Inbox
+      </button>
+      <button class="tab-btn" data-tab="moodle" id="tab-moodle">
+        🎓<br />Moodle
+      </button>
+      <button class="tab-btn" data-tab="chat" id="tab-chat">
+        💬<br />Chat
+      </button>
+      <button class="tab-btn" data-tab="setup" id="tab-setup">
+        ⚙️<br />Setup
+      </button>
     </div>
 
-    <!-- TODAY PANEL -->
+    <!-- TODAY -->
     <div class="panel" id="panel-today">
       <div class="empty-state">
         <span>📅</span>
-        <p>Loading schedule…</p>
+        <p>Loading…</p>
       </div>
     </div>
 
-    <!-- INBOX PANEL -->
+    <!-- INBOX -->
     <div class="panel hidden" id="panel-inbox">
       <div class="empty-state">
         <span>⏳</span>
@@ -519,7 +590,15 @@
       </div>
     </div>
 
-    <!-- CHAT PANEL -->
+    <!-- MOODLE -->
+    <div class="panel hidden" id="panel-moodle">
+      <div class="empty-state">
+        <span>🎓</span>
+        <p>Loading…</p>
+      </div>
+    </div>
+
+    <!-- CHAT -->
     <div class="panel hidden" id="panel-chat">
       <div class="empty-state">
         <span>💬</span>
@@ -527,42 +606,47 @@
       </div>
     </div>
 
-    <!-- SETUP PANEL -->
+    <!-- SETUP -->
     <div class="panel hidden setup-panel" id="panel-setup">
-      <!-- Google Account + Account Switcher -->
       <div class="setup-section">
-        <h3>🔗 Google Accounts</h3>
+        <h3>🔗 Google Account</h3>
         <div class="setup-row">
-          <span class="setup-label">Sync status</span>
-          <span class="status-badge" id="google-status">❓ Unknown</span>
+          <span class="setup-label">Status</span>
+          <span id="google-status" style="font-size: 11px; font-weight: 600"
+            >❓ Unknown</span
+          >
         </div>
-        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
-          Switch between accounts to load emails from a different inbox (e.g.
-          your university email). Both accounts must be signed into Chrome.
-        </p>
-        <div id="accounts-container">
-          <p style="font-size: 11px; color: #999">Loading accounts…</p>
-        </div>
-        <button
-          class="setup-btn"
-          id="btn-google-connect"
-          style="margin-top: 8px"
-        >
-          🔄 Connect &amp; Sync Active Account
+        <button class="setup-btn" id="btn-google-connect">
+          🔄 Connect &amp; Sync Google
         </button>
       </div>
 
-      <!-- Gemini AI -->
+      <div class="setup-section">
+        <h3>🎓 Moodle</h3>
+        <div class="setup-row">
+          <span class="setup-label">Status</span>
+          <span
+            id="moodle-setup-status"
+            style="font-size: 11px; font-weight: 600; color: #e74c3c"
+            >❌ Not connected</span
+          >
+        </div>
+        <button class="setup-btn success" id="btn-go-moodle">
+          Go to Moodle tab to connect →
+        </button>
+      </div>
+
       <div class="setup-section">
         <h3>🤖 Gemini AI (Free)</h3>
-        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
-          Get your free permanent API key at
+        <p style="font-size: 10px; color: #888; margin-bottom: 7px">
+          Free key:
           <a
             href="https://aistudio.google.com"
             target="_blank"
             style="color: #1a3a5c"
             >aistudio.google.com</a
-          >. Free forever: 10 requests/min, 1,500/day. No expiration.
+          >
+          · 10 req/min · permanent
         </p>
         <input
           class="setup-input"
@@ -574,59 +658,40 @@
         <button class="setup-btn" id="btn-save-apikey">Save API Key</button>
       </div>
 
-      <!-- Courses -->
       <div class="setup-section">
-        <h3>📚 My Courses at BGU</h3>
-        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
-          Add your courses so the AI knows your context and can help you prepare
-          for each lecturer's style.
-        </p>
+        <h3>📚 Courses</h3>
         <div id="courses-list"></div>
+        <p style="font-size: 10px; color: #888; margin: 6px 0 4px">
+          Add manually if not using Moodle:
+        </p>
         <input
           class="setup-input"
           type="text"
           id="course-name"
-          placeholder="Course name (e.g. חקר ביצועים)"
+          placeholder="Course name"
         />
         <input
           class="setup-input"
           type="text"
           id="course-lecturer"
-          placeholder='Lecturer name (e.g. ד"ר כהן)'
+          placeholder="Lecturer name"
         />
         <input
           class="setup-input"
           type="text"
           id="course-notes"
-          placeholder="Notes: exam style, main topics, tips…"
+          placeholder="Exam style, key topics…"
         />
         <button class="setup-btn" id="btn-add-course">+ Add Course</button>
       </div>
 
-      <!-- Moodle -->
       <div class="setup-section">
-        <h3>🎓 Moodle (BGU)</h3>
-        <input
-          class="setup-input"
-          type="url"
-          id="moodle-url"
-          placeholder="https://moodle.bgu.ac.il"
-        />
-        <button class="setup-btn" id="btn-save-moodle">Save Moodle URL</button>
-      </div>
-
-      <!-- Manual Sync -->
-      <div class="setup-section">
-        <h3>🔄 Manual Sync</h3>
-        <p style="font-size: 11px; color: #666; margin-bottom: 8px">
-          Calendar syncs every 15 min · Emails sync every 5 min automatically.
-        </p>
+        <h3>🔄 Sync</h3>
         <button class="setup-btn secondary" id="btn-sync-now">
-          🔄 Sync Now
+          🔄 Sync Calendar &amp; Gmail
         </button>
       </div>
     </div>
-    <!-- /setup panel -->
 
     <script src="sidepanel.js"></script>
   </body>
