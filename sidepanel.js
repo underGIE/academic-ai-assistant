@@ -665,7 +665,10 @@ function appendRefs(id,html){const el=document.getElementById(id);if(el){const r
 // The access token expires in 1 hour; we silently refresh it each time the
 // extension opens. If silent refresh fails the user gets a "reconnect" prompt.
 const GMAIL_SCOPE    = 'https://www.googleapis.com/auth/gmail.readonly';
-const CLIENT_ID      = '856203600469-t8oiaao8vmdq5197ockrk9h0aad8jtgb.apps.googleusercontent.com';
+// ⚠️  Must be "Web application" type in Google Cloud Console (NOT "Chrome Extension" type)
+// "Chrome Extension" type only works with chrome.identity.getAuthToken()
+// launchWebAuthFlow requires "Web application" type with the chromiumapp.org redirect URI registered
+const CLIENT_ID      = '856203600469-qb04giv206s7iml703pb9j0db9etlc0e.apps.googleusercontent.com';
 const REDIRECT_URI   = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
 async function launchBGUOAuth(interactive = true) {
