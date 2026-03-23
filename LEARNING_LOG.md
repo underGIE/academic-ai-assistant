@@ -467,5 +467,5 @@ person doing everything.
 
 ## Project Links
 
-- GitHub: https://github.com/AviAndargie/academic-ai-assistant
+- GitHub: https://github.com/undergie/academic-ai-assistant
 - LinkedIn Post: coming soon
