@@ -18,7 +18,8 @@
     "storage",
     "alarms",
     "notifications",
-    "identity"
+    "identity",
+    "tabs"
   ],
 
   "host_permissions": [
@@ -30,7 +31,7 @@
   "oauth2": {
     "client_id": "856203600469-t8oiaao8vmdq5197ockrk9h0aad8jtgb.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
   },

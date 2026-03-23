@@ -103,6 +103,42 @@ export function formatCountdown(event) {
   return `${start.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}`;
 }
 
+// ── Create a new calendar event ──────────────────────────
+// eventData: { title, startDateTime, endDateTime, description }
+// startDateTime/endDateTime: ISO strings like "2026-03-25T10:00:00"
+export async function createCalendarEvent({ title, startDateTime, endDateTime, description = '', allDay = false }) {
+  const token = await getGoogleToken();
+
+  const body = {
+    summary: title,
+    description,
+    start: allDay
+      ? { date: startDateTime.split('T')[0] }
+      : { dateTime: startDateTime, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    end: allDay
+      ? { date: endDateTime.split('T')[0] }
+      : { dateTime: endDateTime,   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+  };
+
+  const res = await fetch(`${CALENDAR_API}/calendars/primary/events`, {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (res.status === 401) {
+    await removeToken(token);
+    return createCalendarEvent({ title, startDateTime, endDateTime, description, allDay });
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Calendar API error ${res.status}`);
+  }
+
+  return res.json(); // returns the created event object
+}
+
 // ── Schedule a Chrome alarm before a lecture ─────────────
 export function scheduleLectureAlarm(events) {
   const now = Date.now();

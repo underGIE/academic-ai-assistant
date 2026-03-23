@@ -117,16 +117,25 @@ async function fetchUpcomingDeadlines(sesskey) {
   const future = now + 90 * 24 * 3600; // 90 days ahead
 
   try {
-    const result = await moodleAjax(
+    // Fetch in two batches of 50 (API max per request is 50)
+    const batch1 = await moodleAjax(
       sesskey,
       'core_calendar_get_action_events_by_timesort',
-      {
-        timesortfrom: now,
-        timesortto:   future,
-        limitnum:     100,
-        limittononsuspendedevents: true,
-      }
+      { timesortfrom: now, timesortto: future, limitnum: 50, limittononsuspendedevents: true }
     );
+    const events1 = batch1?.events || [];
+    // If we got a full batch, fetch the next page using the last event's timesort
+    let events2 = [];
+    if (events1.length === 50) {
+      const lastSort = events1[events1.length - 1].timesort;
+      const batch2 = await moodleAjax(
+        sesskey,
+        'core_calendar_get_action_events_by_timesort',
+        { timesortfrom: lastSort + 1, timesortto: future, limitnum: 50, limittononsuspendedevents: true }
+      ).catch(() => null);
+      events2 = batch2?.events || [];
+    }
+    const result = { events: [...events1, ...events2] };
     return result?.events || [];
   } catch (e) {
     console.warn('[Moodle] Calendar AJAX failed:', e.message);

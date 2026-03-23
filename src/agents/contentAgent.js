@@ -147,22 +147,44 @@ export async function getCourseStudyGuide(courseId) {
   const { courseStudyGuides = {}, geminiApiKey, moodleData } =
     await getStorage(['courseStudyGuides', 'geminiApiKey', 'moodleData']);
 
+  if (!geminiApiKey) throw new Error('No Gemini API key — add it in Setup');
+
   // Return cached if available
   if (courseStudyGuides[courseId]) return courseStudyGuides[courseId];
 
-  // Generate on-demand if not cached
-  if (!geminiApiKey || !moodleData) return null;
+  if (!moodleData) throw new Error('Moodle not synced — go to Moodle tab and sync first');
 
-  const detail = moodleData.courseDetails?.find(d => d.courseId === courseId || d.courseId === +courseId);
-  if (!detail) return null;
+  // Find the full course detail (scraped sections + files)
+  let detail = moodleData.courseDetails?.find(d =>
+    String(d.courseId) === String(courseId)
+  );
 
-  const assigns = (moodleData.assignments || []).filter(a => a.courseId == courseId);
+  // If course page wasn't scraped, fall back to a minimal detail from courses list
+  if (!detail) {
+    const course = (moodleData.courses || []).find(c => String(c.id) === String(courseId));
+    if (!course) throw new Error('Course not found in Moodle data — try re-syncing');
+    console.warn(`[ContentAgent] courseDetails missing for ${courseId} — using minimal fallback`);
+    detail = {
+      courseId:   String(courseId),
+      courseName: course.name,
+      sections:   [],
+      files:      []
+    };
+  }
+
+  const assigns = (moodleData.assignments || []).filter(a => String(a.courseId) === String(courseId));
   const summary = await summarizeCourse(detail, assigns, geminiApiKey);
 
-  const entry = { courseId, courseName: detail.courseName, summary, generatedAt: Date.now() };
+  const entry = {
+    courseId:    String(courseId),
+    courseName:  detail.courseName,
+    summary,
+    fingerprint: courseFingerprint(detail),
+    generatedAt: Date.now()
+  };
 
   // Cache it
-  const updated = { ...courseStudyGuides, [courseId]: entry };
+  const updated = { ...courseStudyGuides, [String(courseId)]: entry };
   await setStorage({ courseStudyGuides: updated });
 
   return entry;

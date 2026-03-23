@@ -24,7 +24,10 @@ function showTab(name) {
 async function loadTodayTab() {
   const panel = document.getElementById('panel-today');
   const { calendarEvents=[], moodleData=null } = await get(['calendarEvents','moodleData']);
-  let html = '';
+  let html = `<div style="display:flex;justify-content:flex-end;padding:6px 10px 0;gap:6px">
+    <button id="btn-notify-check" title="Check notifications now" style="font-size:11px;padding:3px 8px;border:1px solid #ddd;border-radius:8px;background:#f8f9fa;cursor:pointer">🔔</button>
+    <button id="btn-sync-calendar" title="Sync calendar" style="font-size:11px;padding:3px 8px;border:1px solid #ddd;border-radius:8px;background:#f8f9fa;cursor:pointer">🔄</button>
+  </div>`;
 
   const now    = new Date();
   const sorted = calendarEvents
@@ -87,8 +90,95 @@ async function loadTodayTab() {
     </div>`;
   }
 
+  // Add Event FAB button
+  html += `<div style="padding:10px 12px 4px">
+    <button id="btn-add-event" style="width:100%;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+      ＋ Add Event to Calendar
+    </button>
+  </div>`;
+
   panel.innerHTML = html;
   document.getElementById('link-moodle')?.addEventListener('click', e=>{e.preventDefault();showTab('moodle');});
+  document.getElementById('btn-add-event')?.addEventListener('click', showAddEventModal);
+
+  // Notification check button
+  document.getElementById('btn-notify-check')?.addEventListener('click', async () => {
+    try {
+      await chrome.runtime.sendMessage({ type: 'syncCalendar' });
+      showToast('🔔 Checking notifications…');
+    } catch(e) { showToast('Notification check: ' + e.message); }
+  });
+
+  // Calendar re-sync button
+  document.getElementById('btn-sync-calendar')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-sync-calendar');
+    if(btn) btn.textContent = '⏳';
+    try {
+      await chrome.runtime.sendMessage({ type: 'syncCalendar' });
+      await loadTodayTab();
+      showToast('✅ Calendar synced');
+    } catch(e) { showToast('Sync failed: ' + e.message); }
+  });
+}
+
+// ── Add Event Modal ────────────────────────────────────────────────
+function showAddEventModal() {
+  const existing = document.getElementById('add-event-modal');
+  if (existing) { existing.remove(); return; }
+
+  const nowLocal = new Date();
+  nowLocal.setMinutes(nowLocal.getMinutes() - nowLocal.getTimezoneOffset());
+  const defaultStart = nowLocal.toISOString().slice(0,16);
+  const defaultEnd   = new Date(nowLocal.getTime() + 60*60*1000).toISOString().slice(0,16);
+
+  const modal = document.createElement('div');
+  modal.id = 'add-event-modal';
+  modal.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #1a3a5c;padding:16px;z-index:1000;box-shadow:0 -4px 20px rgba(0,0,0,0.15)';
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:13px;font-weight:700;color:#1a3a5c">📅 Add Calendar Event</span>
+      <button id="btn-close-modal" style="background:none;border:none;cursor:pointer;font-size:16px;color:#888">✕</button>
+    </div>
+    <input id="evt-title" type="text" placeholder="Event title *" style="width:100%;padding:7px 9px;border:1px solid #dde;border-radius:6px;font-size:12px;margin-bottom:8px;box-sizing:border-box" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px">Start</label>
+        <input id="evt-start" type="datetime-local" value="${defaultStart}" style="width:100%;padding:6px;border:1px solid #dde;border-radius:6px;font-size:11px;box-sizing:border-box" /></div>
+      <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px">End</label>
+        <input id="evt-end" type="datetime-local" value="${defaultEnd}" style="width:100%;padding:6px;border:1px solid #dde;border-radius:6px;font-size:11px;box-sizing:border-box" /></div>
+    </div>
+    <input id="evt-desc" type="text" placeholder="Description (optional)" style="width:100%;padding:7px 9px;border:1px solid #dde;border-radius:6px;font-size:12px;margin-bottom:10px;box-sizing:border-box" />
+    <button id="btn-create-event" style="width:100%;padding:9px;background:#27ae60;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+      ✅ Create Event
+    </button>
+    <div id="evt-status" style="font-size:11px;color:#888;margin-top:6px;text-align:center"></div>`;
+
+  document.body.appendChild(modal);
+
+  document.getElementById('btn-close-modal').addEventListener('click', () => modal.remove());
+  document.getElementById('btn-create-event').addEventListener('click', async () => {
+    const title = document.getElementById('evt-title')?.value.trim();
+    const start = document.getElementById('evt-start')?.value;
+    const end   = document.getElementById('evt-end')?.value;
+    const desc  = document.getElementById('evt-desc')?.value.trim();
+    const status = document.getElementById('evt-status');
+    if (!title) { status.style.color='#e74c3c'; status.textContent='Please enter a title'; return; }
+    if (!start || !end) { status.style.color='#e74c3c'; status.textContent='Please set start and end time'; return; }
+    const btn = document.getElementById('btn-create-event');
+    btn.disabled = true; btn.textContent = '⏳ Creating…';
+    status.style.color = '#888'; status.textContent = '';
+    try {
+      const { createCalendarEvent } = await import('./src/calendarService.js');
+      await createCalendarEvent({ title, startDateTime: start, endDateTime: end, description: desc });
+      showToast('✅ Event created!');
+      modal.remove();
+      loadTodayTab(); // refresh Today tab
+      chrome.runtime.sendMessage({ type: 'syncCalendar' }).catch(() => {});
+    } catch(e) {
+      btn.disabled = false; btn.textContent = '✅ Create Event';
+      status.style.color = '#e74c3c';
+      status.textContent = e.message.includes('401') ? 'Auth error — try reconnecting Google' : e.message;
+    }
+  });
 }
 
 function formatTime(d){ return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
@@ -127,12 +217,14 @@ function renderInbox(emails, panel) {
   html+=`</div><div class="email-list">`;
 
   filtered.sort((a,b)=>(b.importanceScore||0)-(a.importanceScore||0)).forEach(e=>{
-    const score   = e.importanceScore||0;
+    const score    = e.importanceScore||0;
     const scoreDot = score>=8?'🔴':score>=6?'🟡':score>=4?'🟢':'';
-    html+=`<div class="email-card${e.isUnread?' unread':''}">
+    const acctIdx  = e._isBGU ? 1 : 0; // BGU = account index 1 in Gmail
+    html+=`<div class="email-card${e.isUnread?' unread':''}" data-id="${esc(e.id||'')}" data-acct="${acctIdx}" style="cursor:pointer" title="Click to open in Gmail">
       <div class="email-header">
         ${e.isUnread?'<span class="unread-dot"></span>':''}
         <span class="email-from">${esc(shortFrom(e.from))}</span>
+        ${e._isBGU?'<span style="font-size:9px;color:#1a3a5c;margin-left:3px;font-weight:700">BGU</span>':''}
         <span style="margin-left:auto;font-size:10px">${scoreDot}</span>
         <span class="email-date">${fmtDate(e.date)}</span>
       </div>
@@ -142,6 +234,16 @@ function renderInbox(emails, panel) {
   });
   html+=`</div>`;
   panel.innerHTML = html;
+
+  // Open email in Gmail when clicked
+  panel.querySelectorAll('.email-card[data-id]').forEach(card => {
+    card.addEventListener('click', () => {
+      const id   = card.dataset.id;
+      const acct = card.dataset.acct || '0';
+      if (id) chrome.tabs.create({ url: `https://mail.google.com/mail/u/${acct}/#inbox/${id}` });
+    });
+  });
+
   panel.querySelectorAll('.filter-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{currentFilter=btn.dataset.filter;renderInbox(emails,panel);});
   });
