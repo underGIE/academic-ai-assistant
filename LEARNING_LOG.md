@@ -279,15 +279,136 @@ the decision-support layer. This is systems thinking applied to software.
 
 ---
 
-## Mission 5 — Smart Lecture Note Agent 🎥
+## Mission 5 — Production Hardening + v0.4.0 ✅
 
-_(Coming soon — video frame capture + AI timestamped notes)_
+**Date completed:** March 2026
+**Commits:** `refactor: centralise Gemini`, `feat: redesign Moodle tab`, `fix(bugs): email links + deadlines + two-way sync`
+
+### What I built
+
+**Shared Gemini Client with Global Rate Limit Control** (`src/gemini.js`)
+
+Previously each agent had its own `fetch()` to the Gemini API, with no coordination between them. When multiple agents ran simultaneously they would all fire API calls at once, instantly hitting the 10 RPM free tier limit.
+
+Solution: a shared module with a global semaphore and automatic retry.
+
+- **Semaphore pattern**: only one Gemini call can be in flight at any time. All others queue behind it using a chained Promise (`_pending`).
+- **Exponential backoff**: on a 429 rate-limit response, the code reads the `retryAfter` value from the error body and waits exactly that many seconds before retrying (up to 3 attempts).
+- **Single import**: all 3 agents (`emailAgent`, `contentAgent`, `masterAgent`) now import `callGemini` from one place.
+
+**Moodle AJAX Scraping — Real Deadlines**
+
+BGU Moodle loads course data dynamically via JavaScript. A `fetch()` call to `/my/` only gets an empty HTML shell.
+
+Solution: reverse-engineer the internal AJAX API.
+
+- Extract the `sesskey` (CSRF token) from the HTML using regex
+- Call `lib/ajax/service.php` with `core_calendar_get_action_events_by_timesort`
+- Returns real Unix timestamps — no more guessing from text like "Due: 25/3"
+- API limit is 50 events per call — fetch in two paginated batches of 50
+
+**Moodle Tab Redesign — UX upgrade**
+
+Replaced 27 horizontal tab buttons (unscrollable, unusable) with:
+- A collapsible **Deadlines & Assignments** section at the top showing all upcoming deadlines sorted by urgency with day-countdown labels (red/orange/green)
+- A `<select>` dropdown for course navigation — clean, works for any number of courses
+- A 6-hour smart cache — if data is fresh, renders instantly without re-scraping; if stale, shows cached data immediately and re-syncs silently in background
+
+**Email Agent — Dual Inbox + No Re-scoring**
+
+- Added BGU second account (`andargia@post.bgu.ac.il`) via `chrome.identity.launchWebAuthFlow` — implicit token flow, no backend, no client_secret
+- Email AI score cache (`emailAiScoreCache`): scores are stored by email ID, so borderline emails are never re-scored across agent runs
+- Email cards are now clickable — click any email to open it directly in Gmail at the right account
+
+**Two-Way Calendar Sync**
+
+Previously the extension could only read your calendar. Now you can write to it:
+- "＋ Add Event to Calendar" button in the Today tab opens an inline modal
+- Title, start time, end time, description — one click creates the event via Google Calendar API
+- Calendar scope upgraded from `calendar.readonly` to `calendar.events`
+
+**OS-Level Notifications**
+
+The notification agent was already built but hadn't been tested end-to-end:
+- Fires Chrome OS-level popups for: lectures 30 minutes before start, assignments at 3-day / 1-day / 4-hour checkpoints, overdue alerts, 8AM daily summary
+- Deduplication set prevents the same notification from firing twice
+- 🔔 button in the Today tab triggers an immediate notification check on demand
+
+### Key concepts I learned
+
+**Global Semaphore Pattern**
+
+A semaphore controls access to a shared resource. In JavaScript (single-threaded), you implement it with Promise chaining:
+
+```js
+let _pending = Promise.resolve();
+function withSemaphore(fn) {
+  const next = _pending.then(() => fn()).catch(() => fn());
+  _pending = next.then(()=>{},()=>{});
+  return next;
+}
+```
+
+Every call to `withSemaphore(fn)` chains onto the previous promise. The next function only starts when the previous has finished. This is equivalent to a mutex in multi-threaded systems.
+
+**Reading Rate Limit Responses**
+
+The Gemini API returns `retryAfter` in seconds inside the error body when you're rate-limited (HTTP 429). Instead of waiting a fixed time and guessing, read it directly:
+
+```js
+const retryDelay = (data.error?.details?.[0]?.retryDelay?.replace('s','') || 60) * 1000;
+await new Promise(r => setTimeout(r, retryDelay + 1000));
+```
+
+This is how production systems handle rate limits — adaptive, not fixed.
+
+**Implicit OAuth Token Flow for Second Account**
+
+For a second Google account (BGU email), `chrome.identity.getAuthToken` doesn't work — it only serves the primary Chrome profile account. Instead:
+
+1. Use `chrome.identity.launchWebAuthFlow` with `response_type=token` (implicit flow)
+2. The redirect URI must be `https://<extension-id>.chromiumapp.org/`
+3. This URI must be registered in Google Cloud Console under the OAuth client
+4. The token comes back in the URL hash fragment, not as a query param
+
+**Content Fingerprinting for Cache Invalidation**
+
+Don't cache by timestamp (changes on every sync). Cache by content fingerprint:
+
+```js
+function courseFingerprint(detail) {
+  return `${detail.courseId}_s${sectionCount}_i${itemCount}_f${fileCount}`;
+}
+```
+
+A study guide is only regenerated if the course actually got new content. This is the same technique used in build systems (Make, Webpack) and CDNs.
+
+**Why this matters for I&ME:**
+Rate limiting in APIs is a direct parallel to capacity constraints in manufacturing. The semaphore is a bottleneck management strategy. The retry logic is a scheduling policy. Content fingerprinting is quality control — don't rework a part that hasn't changed.
+
+### Architecture decisions
+
+| Decision | Alternative | Why |
+|---|---|---|
+| Global semaphore for Gemini | Per-agent rate limiting | One control point prevents all agents hammering simultaneously |
+| Implicit OAuth for BGU email | Authorization code flow | No backend server needed; token in URL hash |
+| AJAX API for Moodle deadlines | Parse HTML due dates | Real timestamps, no regex guessing, works for any date format |
+| 6-hour Moodle cache TTL | Re-sync every open | Courses don't change that often; instant load on open |
+| Content fingerprint cache key | lastSync timestamp | Prevents regenerating guides when data hasn't changed |
+
+### Problems I solved
+
+- `redirect_uri_mismatch` for BGU email → URI `https://<extension-id>.chromiumapp.org/` must be in Google Cloud Console
+- `Limit must be between 1 and 50` for calendar AJAX → paginate into two 50-event batches
+- Content agent re-summarizing all courses on every sync → change cache key from timestamp to content fingerprint
+- Email re-scored every agent run → persist scores by email ID in `emailAiScoreCache`
+- Study guide button silently doing nothing → fall back to course name when `courseDetails` not scraped; throw clear error messages
 
 ---
 
-## Mission 6 — Polish + LinkedIn Post
+## Mission 6 — Smart Lecture Note Agent 🎥
 
-_(Coming soon)_
+_(Coming soon — video/audio capture + AI timestamped notes)_
 
 ---
 
@@ -298,8 +419,9 @@ _(Coming soon)_
 ✅ Mission 2 — Google Calendar + real data
 ✅ Mission 3 — Gmail + AI Chat + Gemini
 ✅ Mission 4 — Multi-agent system + Moodle
-🔜 Mission 5 — Smart Lecture Note Agent 🎥
-⬜ Mission 6 — Polish + LinkedIn post
+✅ Mission 5 — Production hardening + v0.4.0
+🔜 Mission 6 — Smart Lecture Note Agent 🎥
+⬜ Mission 7 — Full polish + LinkedIn + Resume
 ```
 
 ---
