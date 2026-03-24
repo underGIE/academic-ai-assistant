@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Academic AI Assistant",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "AI-powered academic secretary for BGU students — Calendar, Gmail, Moodle, and AI chat",
 
   "background": {
@@ -38,5 +38,9 @@
 
   "action": {
     "default_title": "Academic AI Assistant"
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://www.googleapis.com https://generativelanguage.googleapis.com https://moodle.bgu.ac.il https://accounts.google.com;"
   }
 }

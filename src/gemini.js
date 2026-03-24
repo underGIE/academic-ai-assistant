@@ -14,10 +14,17 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // ── Global semaphore: prevents two agents calling Gemini at once ──
+// SEC-03 FIX: old code had `.catch(() => fn())` which silently retried on ANY
+// error, masking the real failure and double-spending API quota.
+// Fix: errors now propagate cleanly to the caller. The _pending tail advances
+// via a separate .then(noop, noop) so the queue always keeps moving even when
+// one call fails.
 let _pending = Promise.resolve();
 
 function withSemaphore(fn) {
-  const next = _pending.then(() => fn()).catch(() => fn());
+  // next resolves/rejects with the actual result of fn()
+  const next = _pending.then(() => fn());
+  // advance the tail regardless — next queued call can proceed either way
   _pending = next.then(() => {}, () => {});
   return next;
 }

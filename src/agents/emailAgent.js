@@ -145,7 +145,9 @@ export async function runEmailAgent() {
     // Give BGU emails a pre-score boost so they're prioritised correctly
     bguEmails.forEach(e => { e._isBGU = true; });
   } else if (bguEmailToken) {
-    console.warn('[EmailAgent] BGU token expired — skipping BGU inbox');
+    // SEC-08: clear expired tokens from storage — no point keeping them around
+    console.warn('[EmailAgent] BGU token expired — clearing from storage, user must reconnect');
+    await setStorage({ bguEmailToken: null, bguEmailExpiry: null });
   }
 
   // ── Merge, deduplicate by email ID ───────────────────────────────

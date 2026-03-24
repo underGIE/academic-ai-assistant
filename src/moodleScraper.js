@@ -5,6 +5,17 @@
 
 const MOODLE_BASE = 'https://moodle.bgu.ac.il/moodle';
 
+// SEC-04: Only allow https:// URLs scraped from Moodle DOM.
+// Blocks javascript:, data:, and other potentially dangerous URL schemes
+// that could be embedded in a compromised Moodle page.
+function safeUrl(raw) {
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' ? raw : '';
+  } catch { return ''; }
+}
+
 // ── Core fetch helper ────────────────────────────────────────────
 async function fetchMoodlePage(path) {
   const url = path.startsWith('http') ? path : `${MOODLE_BASE}${path}`;
@@ -166,7 +177,7 @@ export async function scrapeCourse(courseId) {
         const nameEl = act.querySelector('.instancename, .activityname, a');
         const name   = cleanText(nameEl)?.replace(/\s*(פתח|Open)\s*$/, '').trim();
         const type   = act.className?.match(/modtype_(\w+)/)?.[1] || 'unknown';
-        const url    = act.querySelector('a[href]')?.href || '';
+        const url    = safeUrl(act.querySelector('a[href]')?.href);
         if (name && name.length > 2) items.push({ name, type, url });
       });
 
@@ -179,7 +190,7 @@ export async function scrapeCourse(courseId) {
     .querySelectorAll('li.modtype_resource, li.modtype_url, li.modtype_folder')
     .forEach((el) => {
       const name = cleanText(el.querySelector('.instancename, .activityname, a'));
-      const url  = el.querySelector('a')?.href || '';
+      const url  = safeUrl(el.querySelector('a')?.href);
       const type = el.className.match(/modtype_(\w+)/)?.[1] || 'resource';
       if (name) files.push({ name, url, type });
     });
@@ -199,7 +210,7 @@ async function scrapeVideos(courseId) {
       .forEach((row) => {
         const link  = row.querySelector('a[href]');
         const title = cleanText(link) || cleanText(row.querySelector('td, .title'));
-        const url   = link?.href || '';
+        const url   = safeUrl(link?.href);
         const date  = cleanText(row.querySelector('.date, td:last-child, .video-date'));
         if (title && title.length > 3 && url) {
           videos.push({ title: title.slice(0, 100), url, date });

@@ -550,10 +550,14 @@ async function loadCachedSummary(courseId) {
 function renderSummary(courseId, text) {
   const box = document.getElementById(`summary-${courseId}`);
   if (!box) return;
-  // Convert markdown-style headers to readable HTML
-  const html = text
-    .replace(/^## (.+)$/gm, '<div class="summary-header">$1</div>')
-    .replace(/^- (.+)$/gm,  '<div class="summary-item">• $1</div>')
+  // SEC-01 FIX: escape the raw AI text FIRST, then apply markdown → HTML replacements.
+  // This prevents XSS if Gemini ever returns (or is injected to return) HTML tags
+  // inside headers or list items. The esc() call converts < > & to their HTML entities
+  // so they render as text, not as live DOM elements.
+  const safe = esc(text);
+  const html = safe
+    .replace(/^## (.+)$/gm,  '<div class="summary-header">$1</div>')
+    .replace(/^- (.+)$/gm,   '<div class="summary-item">• $1</div>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n\n/g, '<br>');
   box.innerHTML = `<div class="summary-content">${html}</div>`;
@@ -601,7 +605,7 @@ function loadChatTab() {
       <button class="quick-btn" data-q="תעזור לי להתכונן למבחן הבא">🎯 מבחן</button>
     </div>
     <div class="chat-input-row">
-      <input id="chat-input" type="text" placeholder="שאל את הסוכן הראשי…" />
+      <input id="chat-input" type="text" placeholder="שאל את הסוכן הראשי…" maxlength="2000" />
       <button id="chat-send">שלח</button>
     </div>`;
 
@@ -628,6 +632,8 @@ function loadChatTab() {
 
   async function sendMsg(text) {
     if (!text.trim()) return;
+    // SEC-07: truncate to 2000 chars max to protect API quota
+    text = text.trim().slice(0, 2000);
     addMsg('user',text); input.value='';
     const lid=addMsg('assistant','⏳ חושב…',true);
     try {
