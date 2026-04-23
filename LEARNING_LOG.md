@@ -143,7 +143,7 @@ and throws: "Cannot use import statement outside a module".
 - AI chat powered by Gemini 2.5 Flash — answers questions about schedule and emails
 - RAG (Retrieval-Augmented Generation): assembles context from calendar + emails before each AI call
 - API key stored in chrome.storage so it only needs to be entered once
-- BGU email address (andargia@post.bgu.ac.il) prioritized in importance scoring
+- BGU email address (name@post.bgu...) prioritized in importance scoring
 
 ### Key concepts I learned
 
